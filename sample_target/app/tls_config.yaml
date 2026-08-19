@@ -1,0 +1,4 @@
+server:
+  # TLS 1.2 tambien permite negociar key-exchange RSA o ECDHE.
+  min_tls_version: TLS1.2
+  cert_key_algorithm: ECDSA

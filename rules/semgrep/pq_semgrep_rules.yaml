@@ -1,0 +1,216 @@
+# Reglas Semgrep para el collector de codigo. Cada regla encuentra el uso de
+# un algoritmo y trae metadata.pq_rule_id -> el id correspondiente en
+# rules/pq_rules.yaml, que es quien decide la clasificacion post-cuantica.
+
+rules:
+  # --- Python ---
+  - id: py-rsa-keygen
+    languages: [python]
+    severity: WARNING
+    message: "Generacion de clave RSA detectada"
+    metadata:
+      pq_rule_id: RSA
+    patterns:
+      - pattern-either:
+          - pattern: rsa.generate_private_key(...)
+          - pattern: RSA.generate(...)
+
+  - id: py-ec-keygen
+    languages: [python]
+    severity: WARNING
+    message: "Generacion de clave de curva eliptica (ECDH) detectada"
+    metadata:
+      pq_rule_id: ECDH
+    patterns:
+      - pattern-either:
+          - pattern: ec.generate_private_key(...)
+
+  - id: py-md5
+    languages: [python]
+    severity: WARNING
+    message: "Uso de MD5 detectado"
+    metadata:
+      pq_rule_id: MD5
+    patterns:
+      - pattern-either:
+          - pattern: hashlib.md5(...)
+
+  - id: py-sha1
+    languages: [python]
+    severity: WARNING
+    message: "Uso de SHA-1 detectado"
+    metadata:
+      pq_rule_id: SHA1
+    patterns:
+      - pattern-either:
+          - pattern: hashlib.sha1(...)
+
+  - id: py-sha256
+    languages: [python]
+    severity: INFO
+    message: "Uso de SHA-256 detectado"
+    metadata:
+      pq_rule_id: SHA-256
+    patterns:
+      - pattern-either:
+          - pattern: hashlib.sha256(...)
+
+  - id: py-aes256
+    languages: [python]
+    severity: INFO
+    message: "Uso de AES-256 detectado"
+    metadata:
+      pq_rule_id: AES-256
+    patterns:
+      - pattern-either:
+          - pattern: algorithms.AES256(...)
+
+  # --- Java ---
+  - id: java-3des
+    languages: [java]
+    severity: WARNING
+    message: "Uso de 3DES (DESede) detectado"
+    metadata:
+      pq_rule_id: 3DES
+    patterns:
+      - pattern: Cipher.getInstance($ALG)
+      - metavariable-regex:
+          metavariable: $ALG
+          regex: '"DESede.*'
+
+  - id: java-rc4
+    languages: [java]
+    severity: WARNING
+    message: "Uso de RC4 detectado"
+    metadata:
+      pq_rule_id: RC4
+    patterns:
+      - pattern-either:
+          - pattern: Cipher.getInstance("RC4")
+
+  - id: java-md5
+    languages: [java]
+    severity: WARNING
+    message: "Uso de MD5 detectado"
+    metadata:
+      pq_rule_id: MD5
+    patterns:
+      - pattern-either:
+          - pattern: MessageDigest.getInstance("MD5")
+
+  - id: java-aes128
+    languages: [java]
+    severity: WARNING
+    message: "Uso de AES-128 detectado"
+    metadata:
+      pq_rule_id: AES-128
+    patterns:
+      - pattern: Cipher.getInstance($ALG)
+      - metavariable-regex:
+          metavariable: $ALG
+          regex: '"AES_128.*'
+
+  # --- Go ---
+  - id: go-rsa-keygen
+    languages: [go]
+    severity: WARNING
+    message: "Generacion de clave RSA detectada"
+    metadata:
+      pq_rule_id: RSA
+    patterns:
+      - pattern-either:
+          - pattern: rsa.GenerateKey(...)
+
+  - id: go-md5
+    languages: [go]
+    severity: WARNING
+    message: "Uso de MD5 detectado"
+    metadata:
+      pq_rule_id: MD5
+    patterns:
+      - pattern-either:
+          - pattern: md5.Sum(...)
+          - pattern: md5.New(...)
+
+  - id: go-des
+    languages: [go]
+    severity: WARNING
+    message: "Uso de DES detectado"
+    metadata:
+      pq_rule_id: DES
+    patterns:
+      - pattern-either:
+          - pattern: des.NewCipher(...)
+
+  - id: go-sha256
+    languages: [go]
+    severity: INFO
+    message: "Uso de SHA-256 detectado"
+    metadata:
+      pq_rule_id: SHA-256
+    patterns:
+      - pattern-either:
+          - pattern: sha256.Sum256(...)
+          - pattern: sha256.New(...)
+
+  # --- JavaScript / TypeScript ---
+  - id: js-rsa-keygen
+    languages: [javascript, typescript]
+    severity: WARNING
+    message: "Generacion de clave RSA detectada"
+    metadata:
+      pq_rule_id: RSA
+    patterns:
+      - pattern: crypto.generateKeyPairSync("rsa", ...)
+
+  - id: js-md5
+    languages: [javascript, typescript]
+    severity: WARNING
+    message: "Uso de MD5 detectado"
+    metadata:
+      pq_rule_id: MD5
+    patterns:
+      - pattern: crypto.createHash("md5")
+
+  - id: js-aes128
+    languages: [javascript, typescript]
+    severity: WARNING
+    message: "Uso de AES-128 detectado"
+    metadata:
+      pq_rule_id: AES-128
+    patterns:
+      - pattern: crypto.createCipheriv($ALG, $KEY, $IV)
+      - metavariable-regex:
+          metavariable: $ALG
+          regex: '"aes-128.*'
+
+  - id: js-aes256
+    languages: [javascript, typescript]
+    severity: INFO
+    message: "Uso de AES-256 detectado"
+    metadata:
+      pq_rule_id: AES-256
+    patterns:
+      - pattern: crypto.createCipheriv($ALG, $KEY, $IV)
+      - metavariable-regex:
+          metavariable: $ALG
+          regex: '"aes-256.*'
+
+  # --- YAML (config estructurada; semgrep no matchea comentarios) ---
+  - id: yaml-tls12
+    languages: [yaml]
+    severity: WARNING
+    message: "TLS 1.2 configurado como version minima"
+    metadata:
+      pq_rule_id: TLS1.2
+    patterns:
+      - pattern: 'min_tls_version: TLS1.2'
+
+  - id: yaml-ecdsa-cert
+    languages: [yaml]
+    severity: WARNING
+    message: "Algoritmo de clave de certificado ECDSA configurado"
+    metadata:
+      pq_rule_id: ECDSA
+    patterns:
+      - pattern: 'cert_key_algorithm: ECDSA'

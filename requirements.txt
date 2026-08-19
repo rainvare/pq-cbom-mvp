@@ -1,0 +1,5 @@
+pyyaml>=6.0
+pytest>=7.0
+semgrep>=1.170   # opcional: solo requerido para --engine semgrep
+sslyze>=6.0      # opcional: solo requerido para el subcomando scan-tls
+cryptography>=42 # opcional: solo usado por los tests del collector TLS (generar cert de prueba)
