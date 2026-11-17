@@ -721,3 +721,874 @@ algorithms:
     rationale: "Protocolo roto clásicamente; no debe usarse."
     references: []
     aliases: ["ssh-1", "sshv1", "ssh protocol 1"]
+
+  # ======================================================================
+  # v3 — COBERTURA EXHAUSTIVA
+  # Clasificación autoritativa (campo `basis`): math:shor / math:grover /
+  # broken:classical / nist:standardized / nist:candidate / context.
+  # ======================================================================
+
+  # --- Asimétrica clásica adicional (Shor) ---
+  - id: Rabin
+    name: "Rabin"
+    family: asymmetric
+    primitive: [encryption]
+    math_problem: integer-factorization
+    quantum_attack: shor
+    pq_status: vulnerable
+    nist_status: legacy
+    standard: "Uso histórico"
+    basis: "math:shor"
+    replacement: "ML-KEM-768 (FIPS 203)."
+    rationale: "Basado en factorización; Shor lo rompe en tiempo polinomial."
+    references: []
+    aliases: ["rabin"]
+
+  - id: Paillier
+    name: "Paillier (homomórfico)"
+    family: asymmetric
+    primitive: [encryption]
+    math_problem: composite-residuosity
+    quantum_attack: shor
+    pq_status: vulnerable
+    nist_status: legacy
+    standard: "Uso en voto electrónico / HE"
+    basis: "math:shor"
+    replacement: "Esquemas HE post-cuánticos basados en retículos (BFV/CKKS)."
+    rationale: "Su seguridad se reduce a factorización; Shor la rompe."
+    references: []
+    aliases: ["paillier"]
+
+  - id: Schnorr
+    name: "Firma de Schnorr"
+    family: asymmetric
+    primitive: [signature]
+    math_problem: finite-field-discrete-log
+    quantum_attack: shor
+    pq_status: vulnerable
+    nist_status: legacy
+    standard: "Usada en Bitcoin Taproot (sobre secp256k1)"
+    basis: "math:shor"
+    replacement: "ML-DSA (FIPS 204) o SLH-DSA (FIPS 205)."
+    rationale: "Basada en logaritmo discreto / ECDLP; vulnerable a Shor."
+    references: []
+    aliases: ["schnorr"]
+
+  - id: BLS
+    name: "BLS (firma sobre emparejamientos)"
+    family: asymmetric
+    primitive: [signature]
+    math_problem: elliptic-curve-discrete-log
+    quantum_attack: shor
+    pq_status: vulnerable
+    nist_status: legacy
+    standard: "Usada en Ethereum / agregación de firmas"
+    basis: "math:shor"
+    replacement: "ML-DSA (FIPS 204)."
+    rationale: "Basada en curvas con emparejamientos; Shor rompe el ECDLP subyacente."
+    references: []
+    aliases: ["bls", "bls12-381"]
+
+  - id: ECIES
+    name: "ECIES"
+    family: asymmetric
+    primitive: [encryption]
+    math_problem: elliptic-curve-discrete-log
+    quantum_attack: shor
+    pq_status: vulnerable
+    nist_status: legacy
+    standard: "SEC 1 / IEEE 1363a"
+    basis: "math:shor"
+    replacement: "ML-KEM-768 (FIPS 203) + cifrado simétrico autenticado."
+    rationale: "Cifrado integrado sobre curva elíptica; vulnerable a Shor."
+    references: []
+    aliases: ["ecies"]
+
+  - id: MQV
+    name: "MQV / ECMQV"
+    family: asymmetric
+    primitive: [key-exchange]
+    math_problem: elliptic-curve-discrete-log
+    quantum_attack: shor
+    pq_status: vulnerable
+    nist_status: legacy
+    standard: "SP 800-56A"
+    basis: "math:shor"
+    replacement: "ML-KEM-768 (FIPS 203)."
+    rationale: "Acuerdo de claves autenticado sobre (EC)DLP; vulnerable a Shor."
+    references: ["SP 800-56A"]
+    aliases: ["mqv", "ecmqv"]
+
+  - id: GOST-R-34.10
+    name: "GOST R 34.10 (firma rusa)"
+    family: asymmetric
+    primitive: [signature]
+    math_problem: elliptic-curve-discrete-log
+    quantum_attack: shor
+    pq_status: vulnerable
+    nist_status: legacy
+    standard: "GOST R 34.10-2012 / RFC 7091"
+    basis: "math:shor"
+    replacement: "ML-DSA (FIPS 204) donde aplique."
+    rationale: "Firma sobre curva elíptica; vulnerable a Shor."
+    references: ["RFC 7091"]
+    aliases: ["gost 34.10", "gost-r-34.10", "gostr3410"]
+
+  - id: SM2
+    name: "SM2 (curva elíptica china)"
+    family: asymmetric
+    primitive: [signature, encryption, key-exchange]
+    math_problem: elliptic-curve-discrete-log
+    quantum_attack: shor
+    pq_status: vulnerable
+    nist_status: legacy
+    standard: "GM/T 0003 / ISO/IEC 14888-3"
+    basis: "math:shor"
+    replacement: "ML-KEM / ML-DSA según uso."
+    rationale: "Esquema sobre curva elíptica; vulnerable a Shor."
+    references: []
+    aliases: ["sm2"]
+
+  # --- Firmas hash-based estándar (PQ-seguras, NIST SP 800-208) ---
+  - id: XMSS
+    name: "XMSS (firma hash-based con estado)"
+    family: asymmetric
+    primitive: [signature]
+    math_problem: hash-based
+    quantum_attack: grover
+    pq_status: secure
+    nist_status: standardized
+    standard: "RFC 8391 / NIST SP 800-208"
+    basis: "nist:standardized"
+    replacement: null
+    rationale: "Firma basada en hash aprobada por NIST (con estado); resistente a cuántica."
+    references: ["RFC 8391", "SP 800-208"]
+    aliases: ["xmss", "xmss-mt"]
+
+  - id: LMS
+    name: "LMS / HSS (firma hash-based con estado)"
+    family: asymmetric
+    primitive: [signature]
+    math_problem: hash-based
+    quantum_attack: grover
+    pq_status: secure
+    nist_status: standardized
+    standard: "RFC 8554 / NIST SP 800-208"
+    basis: "nist:standardized"
+    replacement: null
+    rationale: "Firma basada en hash aprobada por NIST (con estado); resistente a cuántica."
+    references: ["RFC 8554", "SP 800-208"]
+    aliases: ["lms", "hss"]
+
+  # --- PQC adicionales: candidatos y ROTOS (clasificación crítica) ---
+  - id: SIKE
+    name: "SIKE / SIDH (isogenias)"
+    family: asymmetric
+    primitive: [kem]
+    math_problem: isogeny
+    quantum_attack: none
+    pq_status: vulnerable
+    nist_status: disallowed
+    standard: "Candidato NIST PQC — ROTO en 2022"
+    deprecate_by: "Roto clásicamente (Castryck-Decru, 2022)"
+    basis: "broken:classical"
+    replacement: "ML-KEM-768 (FIPS 203)."
+    rationale: "Roto por un ataque CLÁSICO en 2022; no usar pese a ser 'post-cuántico'."
+    references: ["Castryck-Decru 2022"]
+    aliases: ["sike", "sidh"]
+
+  - id: Rainbow
+    name: "Rainbow (multivariate)"
+    family: asymmetric
+    primitive: [signature]
+    math_problem: multivariate
+    quantum_attack: none
+    pq_status: vulnerable
+    nist_status: disallowed
+    standard: "Finalista NIST PQC — ROTO en 2022"
+    deprecate_by: "Roto clásicamente (Beullens, 2022)"
+    basis: "broken:classical"
+    replacement: "ML-DSA (FIPS 204) o SLH-DSA (FIPS 205)."
+    rationale: "Roto por un ataque clásico en 2022; no usar."
+    references: ["Beullens 2022"]
+    aliases: ["rainbow"]
+
+  - id: NTRU-Prime
+    name: "NTRU Prime (sntrup761)"
+    family: asymmetric
+    primitive: [kem]
+    math_problem: ntru-lattice
+    quantum_attack: none
+    pq_status: secure
+    nist_status: candidate
+    standard: "Usado por defecto en OpenSSH (sntrup761x25519)"
+    basis: "nist:candidate"
+    replacement: null
+    rationale: "KEM de retículos con parámetros conservadores; desplegado en OpenSSH."
+    references: []
+    aliases: ["ntru prime", "sntrup761", "ntruprime"]
+
+  - id: Saber
+    name: "Saber"
+    family: asymmetric
+    primitive: [kem]
+    math_problem: module-lwr
+    quantum_attack: none
+    pq_status: secure
+    nist_status: candidate
+    standard: "Finalista NIST PQC (no seleccionado)"
+    basis: "nist:candidate"
+    replacement: null
+    rationale: "KEM basado en Module-LWR; finalista, sin ataque conocido."
+    references: []
+    aliases: ["saber"]
+
+  - id: MAYO
+    name: "MAYO (multivariate)"
+    family: asymmetric
+    primitive: [signature]
+    math_problem: multivariate
+    quantum_attack: none
+    pq_status: secure
+    nist_status: candidate
+    standard: "NIST — ronda adicional de firmas"
+    basis: "nist:candidate"
+    replacement: null
+    rationale: "Firma multivariate compacta en evaluación por NIST (on-ramp)."
+    references: ["NIST PQC additional signatures"]
+    aliases: ["mayo"]
+
+  - id: UOV
+    name: "UOV (Unbalanced Oil and Vinegar)"
+    family: asymmetric
+    primitive: [signature]
+    math_problem: multivariate
+    quantum_attack: none
+    pq_status: secure
+    nist_status: candidate
+    standard: "NIST — ronda adicional de firmas"
+    basis: "nist:candidate"
+    replacement: null
+    rationale: "Firma multivariate clásica en evaluación por NIST (on-ramp)."
+    references: ["NIST PQC additional signatures"]
+    aliases: ["uov", "oil and vinegar"]
+
+  - id: SQIsign
+    name: "SQIsign (isogenias)"
+    family: asymmetric
+    primitive: [signature]
+    math_problem: isogeny
+    quantum_attack: none
+    pq_status: secure
+    nist_status: candidate
+    standard: "NIST — ronda adicional de firmas"
+    basis: "nist:candidate"
+    replacement: null
+    rationale: "Firma basada en isogenias, muy compacta, en evaluación por NIST."
+    references: ["NIST PQC additional signatures"]
+    aliases: ["sqisign"]
+
+  # --- Simétrica adicional ---
+  - id: AES-192
+    name: "AES-192"
+    family: symmetric
+    primitive: [encryption]
+    quantum_attack: grover
+    classical_bits: 192
+    quantum_bits: 96
+    pq_status: secure
+    nist_status: standardized
+    standard: "FIPS 197"
+    basis: "math:grover"
+    replacement: null
+    rationale: "Grover deja ~96 bits efectivos; aceptable (categoría NIST 3)."
+    references: ["FIPS 197"]
+    aliases: ["aes-192", "aes192"]
+
+  - id: ARIA
+    name: "ARIA (estándar coreano)"
+    family: symmetric
+    primitive: [encryption]
+    quantum_attack: grover
+    classical_bits: 128
+    quantum_bits: 64
+    pq_status: at_risk
+    nist_status: legacy
+    standard: "RFC 5794 / KS X 1213"
+    basis: "math:grover"
+    replacement: "Usar ARIA-256 o AES-256."
+    rationale: "A 128 bits, Grover deja ~64 efectivos; usar clave de 256 bits."
+    references: ["RFC 5794"]
+    aliases: ["aria"]
+
+  - id: SEED
+    name: "SEED (estándar coreano)"
+    family: symmetric
+    primitive: [encryption]
+    quantum_attack: grover
+    classical_bits: 128
+    quantum_bits: 64
+    pq_status: at_risk
+    nist_status: legacy
+    standard: "RFC 4269"
+    basis: "math:grover"
+    replacement: "AES-256 o ChaCha20-Poly1305."
+    rationale: "Clave de 128 bits; Grover deja ~64 efectivos, margen insuficiente."
+    references: ["RFC 4269"]
+    aliases: ["seed"]
+
+  - id: SM4
+    name: "SM4 (estándar chino)"
+    family: symmetric
+    primitive: [encryption]
+    quantum_attack: grover
+    classical_bits: 128
+    quantum_bits: 64
+    pq_status: at_risk
+    nist_status: legacy
+    standard: "GM/T 0002 / RFC 8998"
+    basis: "math:grover"
+    replacement: "AES-256 o clave simétrica de 256 bits."
+    rationale: "Clave de 128 bits; Grover deja ~64 efectivos, margen insuficiente a largo plazo."
+    references: ["RFC 8998"]
+    aliases: ["sm4"]
+
+  - id: Twofish
+    name: "Twofish"
+    family: symmetric
+    primitive: [encryption]
+    quantum_attack: grover
+    classical_bits: 256
+    quantum_bits: 128
+    pq_status: secure
+    nist_status: legacy
+    standard: "Finalista AES"
+    basis: "math:grover"
+    replacement: null
+    rationale: "Hasta 256 bits de clave; Grover deja ~128 efectivos, suficiente."
+    references: []
+    aliases: ["twofish"]
+
+  - id: Serpent
+    name: "Serpent"
+    family: symmetric
+    primitive: [encryption]
+    quantum_attack: grover
+    classical_bits: 256
+    quantum_bits: 128
+    pq_status: secure
+    nist_status: legacy
+    standard: "Finalista AES"
+    basis: "math:grover"
+    replacement: null
+    rationale: "Hasta 256 bits de clave; Grover deja ~128 efectivos, suficiente."
+    references: []
+    aliases: ["serpent"]
+
+  - id: Salsa20
+    name: "Salsa20"
+    family: symmetric
+    primitive: [encryption]
+    quantum_attack: grover
+    classical_bits: 256
+    quantum_bits: 128
+    pq_status: secure
+    nist_status: legacy
+    standard: "eSTREAM"
+    basis: "math:grover"
+    replacement: null
+    rationale: "Cifrador de flujo de 256 bits; Grover deja ~128 efectivos, suficiente."
+    references: []
+    aliases: ["salsa20"]
+
+  - id: Kuznyechik
+    name: "Kuznyechik (GOST R 34.12 Grasshopper)"
+    family: symmetric
+    primitive: [encryption]
+    quantum_attack: grover
+    classical_bits: 256
+    quantum_bits: 128
+    pq_status: secure
+    nist_status: legacy
+    standard: "GOST R 34.12-2015 / RFC 7801"
+    basis: "math:grover"
+    replacement: null
+    rationale: "Bloque de 128 bits con clave de 256; Grover deja ~128 efectivos."
+    references: ["RFC 7801"]
+    aliases: ["kuznyechik", "grasshopper"]
+
+  - id: Magma
+    name: "Magma (GOST 28147-89)"
+    family: symmetric
+    primitive: [encryption]
+    quantum_attack: grover
+    classical_bits: 256
+    quantum_bits: 128
+    pq_status: at_risk
+    nist_status: legacy
+    standard: "GOST R 34.12-2015 (bloque de 64 bits)"
+    basis: "math:grover"
+    replacement: "Kuznyechik o AES-256 (bloque de 128 bits)."
+    rationale: "Clave de 256 bits pero bloque de 64 bits, vulnerable a colisión de bloque (tipo Sweet32)."
+    references: []
+    aliases: ["magma", "gost 28147"]
+
+  - id: IDEA
+    name: "IDEA"
+    family: symmetric
+    primitive: [encryption]
+    quantum_attack: grover
+    classical_bits: 64
+    quantum_bits: 32
+    pq_status: vulnerable
+    nist_status: legacy
+    standard: "Uso histórico (PGP)"
+    deprecate_by: "Bloque de 64 bits (Sweet32)"
+    basis: "broken:classical"
+    replacement: "AES-256-GCM."
+    rationale: "Bloque de 64 bits vulnerable a colisión de bloque (Sweet32)."
+    references: []
+    aliases: ["idea"]
+
+  - id: CAST5
+    name: "CAST-128 / CAST5"
+    family: symmetric
+    primitive: [encryption]
+    quantum_attack: grover
+    classical_bits: 64
+    quantum_bits: 32
+    pq_status: vulnerable
+    nist_status: legacy
+    standard: "RFC 2144"
+    deprecate_by: "Bloque de 64 bits (Sweet32)"
+    basis: "broken:classical"
+    replacement: "AES-256-GCM."
+    rationale: "Bloque de 64 bits vulnerable a Sweet32."
+    references: ["RFC 2144"]
+    aliases: ["cast5", "cast-128", "cast128"]
+
+  - id: RC2
+    name: "RC2"
+    family: symmetric
+    primitive: [encryption]
+    quantum_attack: grover
+    classical_bits: 64
+    quantum_bits: 32
+    pq_status: vulnerable
+    nist_status: disallowed
+    standard: "RFC 2268 (obsoleto)"
+    deprecate_by: "Obsoleto; bloque de 64 bits"
+    basis: "broken:classical"
+    replacement: "AES-256-GCM."
+    rationale: "Bloque de 64 bits y clave débil; obsoleto."
+    references: ["RFC 2268"]
+    aliases: ["rc2"]
+
+  - id: Skipjack
+    name: "Skipjack"
+    family: symmetric
+    primitive: [encryption]
+    quantum_attack: grover
+    classical_bits: 80
+    quantum_bits: 40
+    pq_status: vulnerable
+    nist_status: disallowed
+    standard: "Retirado (NIST)"
+    deprecate_by: "Clave de 80 bits, retirado"
+    basis: "broken:classical"
+    replacement: "AES-256."
+    rationale: "Clave de 80 bits, insuficiente incluso clásicamente."
+    references: []
+    aliases: ["skipjack"]
+
+  - id: TEA
+    name: "TEA / XTEA"
+    family: symmetric
+    primitive: [encryption]
+    quantum_attack: grover
+    classical_bits: 0
+    quantum_bits: 0
+    pq_status: vulnerable
+    nist_status: disallowed
+    standard: "Académico (debilidades conocidas)"
+    deprecate_by: "Debilidades de clave conocidas"
+    basis: "broken:classical"
+    replacement: "AES-256-GCM."
+    rationale: "Debilidades criptoanalíticas clásicas conocidas (claves relacionadas)."
+    references: []
+    aliases: ["tea", "xtea"]
+
+  # --- Hash adicional ---
+  - id: SHA-224
+    name: "SHA-224"
+    family: hash
+    primitive: [hashing]
+    quantum_attack: grover
+    classical_bits: 224
+    quantum_bits: 112
+    pq_status: secure
+    nist_status: standardized
+    standard: "FIPS 180-4"
+    basis: "math:grover"
+    replacement: null
+    rationale: "Grover deja ~112 bits de preimagen; aceptable para la mayoría de usos."
+    references: ["FIPS 180-4"]
+    aliases: ["sha-224", "sha224"]
+
+  - id: MD4
+    name: "MD4"
+    family: hash
+    primitive: [hashing]
+    quantum_attack: grover
+    classical_bits: 0
+    quantum_bits: 0
+    pq_status: vulnerable
+    nist_status: disallowed
+    standard: "RFC 1320 (roto)"
+    deprecate_by: "Colisiones triviales"
+    basis: "broken:classical"
+    replacement: "SHA-256 o SHA-3-256."
+    rationale: "Colisiones clásicas triviales; no apto para seguridad."
+    references: []
+    aliases: ["md4"]
+
+  - id: MD2
+    name: "MD2"
+    family: hash
+    primitive: [hashing]
+    quantum_attack: grover
+    classical_bits: 0
+    quantum_bits: 0
+    pq_status: vulnerable
+    nist_status: disallowed
+    standard: "RFC 1319 (roto)"
+    deprecate_by: "Obsoleto y roto"
+    basis: "broken:classical"
+    replacement: "SHA-256 o SHA-3-256."
+    rationale: "Hash obsoleto con colisiones y preimágenes conocidas."
+    references: []
+    aliases: ["md2"]
+
+  - id: RIPEMD-160
+    name: "RIPEMD-160"
+    family: hash
+    primitive: [hashing]
+    quantum_attack: grover
+    classical_bits: 160
+    quantum_bits: 80
+    pq_status: at_risk
+    nist_status: legacy
+    standard: "ISO/IEC 10118-3 (usado en Bitcoin)"
+    basis: "math:grover"
+    replacement: "SHA-256 o SHA-3-256 para usos nuevos."
+    rationale: "160 bits: resistencia a colisión ~80 bits, margen marginal a largo plazo."
+    references: []
+    aliases: ["ripemd-160", "ripemd160", "ripemd"]
+
+  - id: Whirlpool
+    name: "Whirlpool"
+    family: hash
+    primitive: [hashing]
+    quantum_attack: grover
+    classical_bits: 512
+    quantum_bits: 256
+    pq_status: secure
+    nist_status: legacy
+    standard: "ISO/IEC 10118-3"
+    basis: "math:grover"
+    replacement: null
+    rationale: "Hash de 512 bits; amplio margen frente a Grover."
+    references: []
+    aliases: ["whirlpool"]
+
+  - id: Streebog
+    name: "Streebog (GOST R 34.11-2012)"
+    family: hash
+    primitive: [hashing]
+    quantum_attack: grover
+    classical_bits: 256
+    quantum_bits: 128
+    pq_status: secure
+    nist_status: legacy
+    standard: "GOST R 34.11-2012 / RFC 6986"
+    basis: "math:grover"
+    replacement: null
+    rationale: "Hash ruso de 256/512 bits; margen suficiente frente a Grover."
+    references: ["RFC 6986"]
+    aliases: ["streebog", "gost r 34.11"]
+
+  - id: SM3
+    name: "SM3 (estándar chino)"
+    family: hash
+    primitive: [hashing]
+    quantum_attack: grover
+    classical_bits: 256
+    quantum_bits: 128
+    pq_status: secure
+    nist_status: legacy
+    standard: "GM/T 0004 / RFC 8998"
+    basis: "math:grover"
+    replacement: null
+    rationale: "Hash de 256 bits; margen suficiente frente a Grover."
+    references: ["RFC 8998"]
+    aliases: ["sm3"]
+
+  - id: Tiger
+    name: "Tiger"
+    family: hash
+    primitive: [hashing]
+    quantum_attack: grover
+    classical_bits: 192
+    quantum_bits: 96
+    pq_status: at_risk
+    nist_status: legacy
+    standard: "Académico (uso histórico)"
+    basis: "math:grover"
+    replacement: "SHA-256 o SHA-3-256."
+    rationale: "Hash antiguo poco analizado modernamente; preferir SHA-2/SHA-3."
+    references: []
+    aliases: ["tiger"]
+
+  # --- MAC ---
+  - id: HMAC
+    name: "HMAC"
+    family: mac
+    primitive: [mac]
+    quantum_attack: grover
+    pq_status: secure
+    nist_status: standardized
+    standard: "FIPS 198-1 / RFC 2104"
+    basis: "math:grover"
+    replacement: null
+    rationale: "Seguro si el hash subyacente lo es (HMAC-SHA256+); Grover no lo degrada significativamente."
+    references: ["FIPS 198-1"]
+    aliases: ["hmac"]
+
+  - id: CMAC
+    name: "CMAC"
+    family: mac
+    primitive: [mac]
+    quantum_attack: grover
+    pq_status: secure
+    nist_status: standardized
+    standard: "SP 800-38B"
+    basis: "math:grover"
+    replacement: null
+    rationale: "MAC basado en cifrador de bloque; seguro con AES-256."
+    references: ["SP 800-38B"]
+    aliases: ["cmac"]
+
+  - id: GMAC
+    name: "GMAC"
+    family: mac
+    primitive: [mac]
+    quantum_attack: grover
+    pq_status: secure
+    nist_status: standardized
+    standard: "SP 800-38D"
+    basis: "math:grover"
+    replacement: null
+    rationale: "MAC del modo GCM; seguro con AES-256 y nonce único."
+    references: ["SP 800-38D"]
+    aliases: ["gmac"]
+
+  - id: Poly1305
+    name: "Poly1305"
+    family: mac
+    primitive: [mac]
+    quantum_attack: none
+    pq_status: secure
+    nist_status: standardized
+    standard: "RFC 8439"
+    basis: "math:grover"
+    replacement: null
+    rationale: "MAC de un solo uso usado en ChaCha20-Poly1305; sin impacto cuántico relevante."
+    references: ["RFC 8439"]
+    aliases: ["poly1305"]
+
+  - id: KMAC
+    name: "KMAC"
+    family: mac
+    primitive: [mac]
+    quantum_attack: grover
+    pq_status: secure
+    nist_status: standardized
+    standard: "SP 800-185"
+    basis: "math:grover"
+    replacement: null
+    rationale: "MAC basado en Keccak; margen suficiente frente a Grover."
+    references: ["SP 800-185"]
+    aliases: ["kmac"]
+
+  # --- KDF adicional ---
+  - id: HKDF
+    name: "HKDF"
+    family: kdf
+    primitive: [key-derivation]
+    quantum_attack: grover
+    pq_status: secure
+    nist_status: standardized
+    standard: "RFC 5869"
+    basis: "math:grover"
+    replacement: null
+    rationale: "Derivación de clave basada en HMAC; segura con hash moderno."
+    references: ["RFC 5869"]
+    aliases: ["hkdf"]
+
+  - id: scrypt
+    name: "scrypt"
+    family: kdf
+    primitive: [password-hashing]
+    quantum_attack: grover
+    pq_status: secure
+    nist_status: legacy
+    standard: "RFC 7914"
+    basis: "math:grover"
+    replacement: null
+    rationale: "Hash de contraseñas con dureza de memoria; no cuántico-crítico."
+    references: ["RFC 7914"]
+    aliases: ["scrypt"]
+
+  # --- Modos de operación ---
+  - id: ECB
+    name: "Modo ECB"
+    family: mode
+    primitive: [mode-of-operation]
+    quantum_attack: none
+    pq_status: vulnerable
+    nist_status: disallowed
+    standard: "SP 800-38A (no recomendado)"
+    deprecate_by: "Filtra patrones del texto plano"
+    basis: "broken:classical"
+    replacement: "Modo autenticado: AES-256-GCM o ChaCha20-Poly1305."
+    rationale: "ECB revela patrones (bloques iguales -> cifrado igual); inseguro independientemente del cifrador."
+    references: ["SP 800-38A"]
+    aliases: ["ecb", "mode_ecb", "aes-ecb"]
+
+  - id: CBC
+    name: "Modo CBC"
+    family: mode
+    primitive: [mode-of-operation]
+    quantum_attack: none
+    pq_status: at_risk
+    nist_status: legacy
+    standard: "SP 800-38A"
+    basis: "context"
+    replacement: "Modo autenticado (AES-GCM) para evitar oráculos de padding."
+    rationale: "Sin autenticación, expuesto a oráculos de padding (POODLE/Lucky13) si se usa mal."
+    references: ["SP 800-38A"]
+    aliases: ["cbc", "aes-cbc", "mode_cbc"]
+
+  - id: GCM
+    name: "Modo GCM"
+    family: mode
+    primitive: [mode-of-operation]
+    quantum_attack: none
+    pq_status: secure
+    nist_status: standardized
+    standard: "SP 800-38D"
+    basis: "context"
+    replacement: null
+    rationale: "Cifrado autenticado (AEAD); seguro con nonce único y AES-256."
+    references: ["SP 800-38D"]
+    aliases: ["gcm", "aes-gcm", "aes-256-gcm"]
+
+  - id: CTR
+    name: "Modo CTR"
+    family: mode
+    primitive: [mode-of-operation]
+    quantum_attack: none
+    pq_status: secure
+    nist_status: standardized
+    standard: "SP 800-38A"
+    basis: "context"
+    replacement: null
+    rationale: "Modo de flujo seguro con nonce único; combínese con un MAC para autenticación."
+    references: ["SP 800-38A"]
+    aliases: ["ctr", "aes-ctr"]
+
+  # --- Protocolos adicionales ---
+  - id: SSHv2
+    name: "SSH protocolo 2"
+    family: protocol
+    primitive: [transport]
+    quantum_attack: shor
+    pq_status: unknown
+    nist_status: standardized
+    standard: "RFC 4251+"
+    basis: "context"
+    replacement: "Habilitar KEX híbrido PQC (sntrup761x25519 / mlkem768x25519)."
+    rationale: "Seguro hoy, pero el estado PQC depende del key-exchange negociado (clásico vs. híbrido)."
+    references: ["RFC 4251"]
+    aliases: ["ssh-2", "sshv2", "openssh"]
+
+  - id: IKEv1
+    name: "IKEv1 / IPsec"
+    family: protocol
+    primitive: [transport]
+    quantum_attack: shor
+    pq_status: vulnerable
+    nist_status: deprecated
+    standard: "RFC 2409 (obsoleto)"
+    deprecate_by: "Deprecado (RFC 8247 recomienda IKEv2)"
+    basis: "math:shor"
+    replacement: "IKEv2 con grupos PQC / RFC 9370."
+    rationale: "Protocolo antiguo que negocia DH clásico; roto por Shor y con debilidades propias."
+    references: ["RFC 2409"]
+    aliases: ["ikev1", "isakmp"]
+
+  - id: IKEv2
+    name: "IKEv2 / IPsec"
+    family: protocol
+    primitive: [transport]
+    quantum_attack: shor
+    pq_status: at_risk
+    nist_status: standardized
+    standard: "RFC 7296 / RFC 9370 (PQC)"
+    basis: "context"
+    replacement: "Habilitar intercambio de claves adicional PQC (RFC 9370)."
+    rationale: "Depende de los grupos DH/ECDH negociados; vulnerable a Shor salvo con extensión PQC."
+    references: ["RFC 9370"]
+    aliases: ["ikev2"]
+
+  - id: WPA3
+    name: "WPA3 (Wi-Fi)"
+    family: protocol
+    primitive: [transport]
+    quantum_attack: shor
+    pq_status: at_risk
+    nist_status: standardized
+    standard: "Wi-Fi Alliance / SAE (Dragonfly)"
+    basis: "math:shor"
+    replacement: "Pendiente de perfil PQC del Wi-Fi; mitigar con secretos largos."
+    rationale: "SAE usa curvas elípticas (Dragonfly); el handshake es vulnerable a Shor a largo plazo."
+    references: []
+    aliases: ["wpa3", "sae", "dragonfly"]
+
+  - id: QUIC
+    name: "QUIC"
+    family: protocol
+    primitive: [transport]
+    quantum_attack: shor
+    pq_status: unknown
+    nist_status: standardized
+    standard: "RFC 9000 (usa TLS 1.3)"
+    basis: "context"
+    replacement: "Mismo camino que TLS 1.3: KEX híbrido PQC."
+    rationale: "Hereda la criptografía de TLS 1.3; su estado PQC depende del key-exchange negociado."
+    references: ["RFC 9000"]
+    aliases: ["quic"]
+
+  - id: OpenPGP
+    name: "OpenPGP / GPG"
+    family: protocol
+    primitive: [messaging]
+    quantum_attack: shor
+    pq_status: at_risk
+    nist_status: standardized
+    standard: "RFC 9580"
+    basis: "math:shor"
+    replacement: "Perfil PQC de OpenPGP (borrador) cuando esté disponible."
+    rationale: "Usa RSA/ECC para claves de usuario; vulnerable a Shor (relevante para HNDL de correo)."
+    references: ["RFC 9580"]
+    aliases: ["openpgp", "gpg", "pgp"]

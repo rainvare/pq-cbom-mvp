@@ -57,8 +57,10 @@ rules:
     match: ["AES-?256", "AES\\.new\\([^)]*32", "AES_256"]
   - id: AES-128
     match: ["AES-?128", "AES_128"]
+  - id: AES-192
+    match: ["AES-?192", "AES_192"]
   - id: AES-GENERIC
-    match: ["\\bAES\\b(?!-?(128|256))"]
+    match: ["\\bAES\\b(?!-?(128|192|256))"]
   - id: ChaCha20
     match: ["ChaCha20"]
   - id: Camellia
@@ -103,3 +105,100 @@ rules:
     match: ["TLSv?1\\.3", "TLS 1\\.3"]
   - id: SSHv1
     match: ["SSH-1", "SSHv1", "Protocol 1"]
+
+  # --- v3: detectores adicionales (bajo riesgo de falso positivo) ---
+  # Asimétrica clásica
+  - id: Rabin
+    match: ["\\bRabin\\b"]
+  - id: Paillier
+    match: ["Paillier"]
+  - id: Schnorr
+    match: ["Schnorr"]
+  - id: BLS
+    match: ["BLS12-381", "\\bBLS\\b"]
+  - id: ECIES
+    match: ["ECIES"]
+  - id: MQV
+    match: ["ECMQV", "\\bMQV\\b"]
+  - id: SM2
+    match: ["\\bSM2\\b"]
+  - id: GOST-R-34.10
+    match: ["GOST.?R.?34\\.10", "gostr3410"]
+  # PQC adicionales (incl. rotos)
+  - id: SIKE
+    match: ["\\bSIKE\\b", "\\bSIDH\\b"]
+  - id: NTRU-Prime
+    match: ["sntrup761", "NTRU.?Prime"]
+  - id: XMSS
+    match: ["\\bXMSS\\b"]
+  - id: LMS
+    match: ["\\bLMS\\b"]
+  - id: SQIsign
+    match: ["SQIsign"]
+  - id: UOV
+    match: ["\\bUOV\\b"]
+  # Simétrica
+  - id: Twofish
+    match: ["Twofish"]
+  - id: Serpent
+    match: ["\\bSerpent\\b"]
+  - id: Salsa20
+    match: ["Salsa20"]
+  - id: CAST5
+    match: ["CAST5", "CAST-128", "CAST_128"]
+  - id: RC2
+    match: ["\\bRC2\\b"]
+  - id: SM4
+    match: ["\\bSM4\\b"]
+  - id: Kuznyechik
+    match: ["Kuznyechik", "Grasshopper", "GOST.?R.?34\\.12"]
+  # Hash
+  - id: SM3
+    match: ["\\bSM3\\b"]
+  - id: Streebog
+    match: ["Streebog", "GOST.?R.?34\\.11", "gostr3411"]
+  - id: SHA-224
+    match: ["SHA-?224"]
+  - id: RIPEMD-160
+    match: ["RIPEMD-?160", "ripemd160", "\\bRIPEMD\\b"]
+  - id: MD4
+    match: ["\\bMD4\\b"]
+  - id: MD2
+    match: ["\\bMD2\\b"]
+  - id: Whirlpool
+    match: ["Whirlpool"]
+  # MAC / KDF
+  - id: HMAC
+    match: ["\\bHMAC\\b", "hmac\\."]
+  - id: CMAC
+    match: ["\\bCMAC\\b"]
+  - id: GMAC
+    match: ["\\bGMAC\\b"]
+  - id: Poly1305
+    match: ["Poly1305"]
+  - id: KMAC
+    match: ["\\bKMAC\\b"]
+  - id: HKDF
+    match: ["\\bHKDF\\b"]
+  - id: scrypt
+    match: ["\\bscrypt\\b"]
+  # Modos de operación
+  - id: ECB
+    match: ["\\bECB\\b", "MODE_ECB", "AES-ECB"]
+  - id: CBC
+    match: ["\\bCBC\\b", "MODE_CBC", "AES-CBC"]
+  - id: GCM
+    match: ["\\bGCM\\b", "AES-?GCM", "MODE_GCM"]
+  - id: CTR
+    match: ["\\bCTR\\b", "MODE_CTR", "AES-CTR"]
+  # Protocolos
+  - id: SSHv2
+    match: ["OpenSSH", "SSH-2"]
+  - id: IKEv1
+    match: ["IKEv1", "ISAKMP"]
+  - id: IKEv2
+    match: ["IKEv2"]
+  - id: QUIC
+    match: ["\\bQUIC\\b"]
+  - id: OpenPGP
+    match: ["OpenPGP", "\\bGPG\\b", "\\bPGP\\b"]

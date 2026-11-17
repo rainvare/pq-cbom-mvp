@@ -47,6 +47,28 @@ def test_every_detector_id_exists_in_knowledge():
     assert not missing, f"Detectores sin entrada en la base de conocimiento: {missing}"
 
 
+def test_broken_pqc_is_not_classified_secure(kb):
+    """Guardia crítica: algoritmos 'post-cuánticos' ROTOS clásicamente
+    (SIKE/SIDH, Rainbow) nunca deben figurar como seguros."""
+    for broken in ("SIKE", "Rainbow"):
+        assert kb.get(broken).pq_status == "vulnerable", f"{broken} debe ser vulnerable (roto)"
+
+
+def test_basis_is_valid_when_present(kb):
+    from pq_cbom.knowledge import VALID_BASIS
+    for e in kb.all():
+        if e.basis is not None:
+            assert e.basis in VALID_BASIS, f"{e.id}: basis inválido"
+
+
+def test_knowledge_is_comprehensive(kb):
+    """La base cubre familias nacionales, modos y PQC de varias rondas."""
+    expected = {"SM2", "SM3", "SM4", "GOST-R-34.10", "Streebog", "Kuznyechik",
+                "ARIA", "SEED", "XMSS", "LMS", "SIKE", "NTRU-Prime", "ECB", "GCM"}
+    missing = expected - set(kb.by_id)
+    assert not missing, f"Faltan en la base de conocimiento: {missing}"
+
+
 def test_classification_comes_from_knowledge():
     """El pq_status del detector debe coincidir con el de la KB (fuente de verdad)."""
     kb = KnowledgeBase.load(KB_PATH)

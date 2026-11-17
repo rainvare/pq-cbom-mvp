@@ -14,7 +14,18 @@ from typing import Optional
 import yaml
 
 VALID_PQ_STATUS = {"vulnerable", "at_risk", "secure", "unknown"}
-VALID_FAMILIES = {"asymmetric", "symmetric", "hash", "mac", "kdf", "protocol"}
+VALID_FAMILIES = {"asymmetric", "symmetric", "hash", "mac", "kdf", "mode", "protocol"}
+
+# Base de la clasificación (procedencia/autoridad). Hace explícito POR QUÉ un
+# veredicto es fiable: matemática determinista, rotura conocida o estándar NIST.
+VALID_BASIS = {
+    "math:shor",        # roto en tiempo polinomial por Shor (determinista)
+    "math:grover",      # Grover reduce la seguridad a la mitad (determinista)
+    "broken:classical", # ya roto clásicamente (colisión/criptoanálisis)
+    "nist:standardized",# seguro por estandarización NIST PQC
+    "nist:candidate",   # en proceso de estandarización
+    "context",          # depende de parámetros/suite (requiere confirmar)
+}
 
 DEFAULT_KNOWLEDGE_PATH = (
     Path(__file__).resolve().parent.parent / "knowledge" / "algorithms.yaml"
@@ -39,6 +50,7 @@ class AlgorithmEntry:
     nist_status: Optional[str] = None
     standard: Optional[str] = None
     deprecate_by: Optional[str] = None
+    basis: Optional[str] = None  # procedencia de la clasificación (ver VALID_BASIS)
     references: list[str] = field(default_factory=list)
     aliases: list[str] = field(default_factory=list)
 
@@ -91,6 +103,7 @@ class KnowledgeBase:
                 nist_status=a.get("nist_status"),
                 standard=a.get("standard"),
                 deprecate_by=a.get("deprecate_by"),
+                basis=a.get("basis"),
                 references=a.get("references", []) or [],
                 aliases=a.get("aliases", []) or [],
             )
@@ -116,6 +129,11 @@ class KnowledgeBase:
                 raise ValueError(
                     f"Algoritmo {a['id']}: family '{a['family']}' inválida "
                     f"(debe ser una de {sorted(VALID_FAMILIES)})"
+                )
+            if a.get("basis") is not None and a["basis"] not in VALID_BASIS:
+                raise ValueError(
+                    f"Algoritmo {a['id']}: basis '{a['basis']}' inválido "
+                    f"(debe ser uno de {sorted(VALID_BASIS)})"
                 )
             if a["id"] in seen:
                 raise ValueError(f"Algoritmo duplicado en la base de conocimiento: {a['id']}")
