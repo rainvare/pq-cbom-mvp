@@ -210,3 +210,47 @@ PY
 ```
 
 Para servirlo: cualquier hosting estático (Netlify, GitHub Pages) apuntando a `docs/` (GitHub Pages usa esa carpeta).
+
+---
+
+## v4 — Dependencias, modo CI y smart contracts
+
+### Collector de dependencias (`scan-deps`)
+
+Encuentra la criptografía que entra por librería (aunque no aparezca ningún
+algoritmo en el código). Lee `package.json`, `requirements.txt`, `go.mod`,
+`pom.xml`, `Cargo.toml`, `Gemfile`... Mapea paquetes a algoritmos cuando es
+inequívoco (elliptic → ECDSA, bcrypt → bcrypt) y marca librerías abandonadas o
+con CVE conocida. *No es un feed de CVE completo* (lista curada); OSV.dev sería
+el siguiente paso.
+
+```bash
+python -m pq_cbom.cli scan-deps ./mi-repo
+```
+
+### Modo CI (`--fail-on`) y tamaño de clave
+
+- `scan`, `scan-keys`, `scan-deps` aceptan `--fail-on {vulnerable,at_risk,unknown}`
+  y devuelven código de salida 1 para romper un build.
+- `risk` acepta `--fail-on {critical,high,medium,low}` según la banda de riesgo.
+- El modelo de riesgo ahora cuenta **claves cortas** (RSA/DSA <2048, EC <256),
+  débiles ya hoy, detectadas por `scan-keys`.
+
+```bash
+python -m pq_cbom.cli scan ./repo --fail-on vulnerable     # falla si hay cripto rota
+python -m pq_cbom.cli risk cbom.json --fail-on high        # falla si el riesgo es alto
+```
+
+### Análisis de smart contracts (`scan-contracts`)
+
+Linter estático de vulnerabilidades de Solidity alineado con el
+[SWC Registry](https://swcregistry.io): reentrancy (SWC-107), tx.origin
+(SWC-115), delegatecall (SWC-112), selfdestruct (SWC-106), aleatoriedad débil
+(SWC-120), overflow en <0.8 (SWC-101), pragma flotante (SWC-103) y más. Incluye
+el puente cripto/post-cuántico: `ecrecover` usa ECDSA sobre secp256k1,
+vulnerable a Shor. Es heurística por patrón para revisión humana (puede dar
+falsos positivos), no análisis simbólico.
+
+```bash
+python -m pq_cbom.cli scan-contracts ./contracts --fail-on high
+```

@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections import Counter
 from pathlib import Path
 
-from . import keyfile_scanner, passive_scanner, scanner, semgrep_scanner, tls_scanner
+from . import keyfile_scanner, manifest_scanner, passive_scanner, scanner, semgrep_scanner, tls_scanner
 from .priority import score as priority_score
 from .rules_engine import RuleSet
 from .scanner import RawMatch
@@ -97,6 +97,20 @@ def build_cbom_keys(
     exclude = {output_path.resolve()} if output_path else set()
     raw_matches = keyfile_scanner.scan_directory(target, exclude=exclude)
     return _assemble_entries(raw_matches, ruleset, detected_by="pq-cbom-mvp/key-scanner")
+
+
+def build_cbom_deps(
+    target: Path,
+    rules_path: Path,
+    output_path: Path | None = None,
+) -> tuple[list[CBOMEntry], "manifest_scanner.DepsResult"]:
+    """Escanea manifiestos de dependencias bajo `target` y devuelve el CBOM de
+    algoritmos implicados más el inventario de librerías cripto."""
+    ruleset = RuleSet.load(rules_path)
+    exclude = {output_path.resolve()} if output_path else set()
+    result = manifest_scanner.scan_directory(target, exclude=exclude)
+    entries = _assemble_entries(result.matches, ruleset, detected_by="pq-cbom-mvp/deps-scanner")
+    return entries, result
 
 
 def build_cbom_passive(

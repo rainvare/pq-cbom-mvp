@@ -8,7 +8,13 @@ import sys
 from collections import Counter
 from pathlib import Path
 
-from .build import build_cbom, build_cbom_keys, build_cbom_passive, build_cbom_tls
+from .build import (
+    build_cbom,
+    build_cbom_deps,
+    build_cbom_keys,
+    build_cbom_passive,
+    build_cbom_tls,
+)
 from .knowledge import KnowledgeBase
 from .passive_scanner import PassiveScanError
 from .risk_model import assess as risk_assess
@@ -16,6 +22,7 @@ from .semgrep_scanner import SemgrepNotAvailable
 from .tls_scanner import TlsScanError
 
 DEFAULT_RULES = Path(__file__).resolve().parent.parent / "rules" / "pq_rules.yaml"
+DEFAULT_CONTRACT_RULES = Path(__file__).resolve().parent.parent / "rules" / "contract_rules.yaml"
 DEFAULT_SEMGREP_RULES = Path(__file__).resolve().parent.parent / "rules" / "semgrep" / "pq_semgrep_rules.yaml"
 
 _STATUS_ORDER = ["vulnerable", "at_risk", "unknown", "secure"]
@@ -82,6 +89,23 @@ def _print_passive_context(result) -> None:
         print(f"  · {note}")
 
 
+_PQ_SEVERITY = {"vulnerable": 3, "at_risk": 2, "unknown": 1, "secure": 0}
+_BAND_SEVERITY = {"critical": 4, "high": 3, "medium": 2, "low": 1, "none": 0}
+
+
+def _ci_gate_entries(entries, fail_on: str | None) -> int:
+    """Devuelve 1 si algún hallazgo alcanza el nivel `fail_on` (o peor)."""
+    if not fail_on:
+        return 0
+    threshold = _PQ_SEVERITY[fail_on]
+    worst = [e for e in entries if _PQ_SEVERITY.get(e.classification.pq_status, 0) >= threshold]
+    if worst:
+        print(f"\n[CI] FALLO: {len(worst)} hallazgo(s) de nivel '{fail_on}' o peor.", file=sys.stderr)
+        return 1
+    print(f"\n[CI] OK: sin hallazgos de nivel '{fail_on}' o peor.")
+    return 0
+
+
 def _load_cbom_entries(path: Path):
     """Reconstruye objetos con acceso por atributo desde un cbom.json."""
     from types import SimpleNamespace
@@ -92,7 +116,10 @@ def _load_cbom_entries(path: Path):
         asset = e.get("crypto_asset", {})
         entries.append(
             SimpleNamespace(
-                finding=SimpleNamespace(location=asset.get("location", "")),
+                finding=SimpleNamespace(
+                    location=asset.get("location", ""),
+                    snippet=asset.get("evidence_snippet", ""),
+                ),
                 classification=SimpleNamespace(**e.get("classification", {})),
                 priority=SimpleNamespace(**e.get("priority", {})),
             )
@@ -107,6 +134,8 @@ def _print_risk(a) -> None:
     print(f"  Preparación cuántica         : {a.quantum_readiness}% ya cuántico-seguro")
     print(f"  Índice de riesgo             : {a.risk_index}/100 [{a.risk_band}]")
     print(f"  Exposición HNDL              : {a.hndl_exposed} activos asimétricos rompibles por Shor")
+    if getattr(a, "short_keys", 0):
+        print(f"  Claves cortas (débiles hoy)  : {a.short_keys}")
 
     m = a.mosca or {}
     print("\n  -- Teorema de Mosca (harvest now, decrypt later) --")
@@ -129,6 +158,22 @@ def _print_risk(a) -> None:
             if slot:
                 print(f"     [{band:8s}] {slot['count']:3d} hallazgos | {slot['action']}")
                 print(f"                 algoritmos: {', '.join(slot['algorithms'])}")
+
+
+def _print_contracts(rep: dict) -> None:
+    """Imprime el resumen del análisis de smart contracts."""
+    print(f"\n=== Vulnerabilidades de smart contracts: {rep['total']} hallazgos ===")
+    for sev in ["critical", "high", "medium", "low", "info"]:
+        n = rep["summary"].get(sev, 0)
+        if n:
+            print(f"  {sev:9s}: {n}")
+    print("\n=== Hallazgos (por gravedad) ===")
+    for f in rep["findings"][:20]:
+        print(f"  [{f['severity']:8s}] {f['rule_id']:22s} {f['file']}:{f['line']}")
+        print(f"      {f['title']}")
+        print(f"      -> {f['remediation']}")
+    if rep["total"] > 20:
+        print(f"  ... y {rep['total'] - 20} más (ver informe JSON)")
 
 
 def _run_kb(query: str | None) -> int:
@@ -181,6 +226,8 @@ def main(argv: list[str] | None = None) -> int:
         help="Paquete de reglas Semgrep (solo aplica con --engine semgrep)",
     )
     scan_p.add_argument("--output", type=Path, default=None, help="Ruta de salida para cbom.json")
+    scan_p.add_argument("--fail-on", choices=["vulnerable", "at_risk", "unknown"], default=None,
+                        help="Modo CI: salir con código 1 si hay hallazgos de este nivel o peor.")
     scan_p.add_argument("--quiet", action="store_true", help="No imprimir resumen en consola")
 
     tls_p = sub.add_parser("scan-tls", help="Escanea protocolo TLS y certificado de un host (via sslyze)")
@@ -195,7 +242,17 @@ def main(argv: list[str] | None = None) -> int:
     keys_p.add_argument("target", type=Path, help="Directorio a escanear")
     keys_p.add_argument("--rules", type=Path, default=DEFAULT_RULES, help="Paquete de detectores YAML")
     keys_p.add_argument("--output", type=Path, default=None, help="Ruta de salida para cbom.json")
+    keys_p.add_argument("--fail-on", choices=["vulnerable", "at_risk", "unknown"], default=None,
+                        help="Modo CI: salir con código 1 si hay hallazgos de este nivel o peor.")
     keys_p.add_argument("--quiet", action="store_true", help="No imprimir resumen en consola")
+
+    deps_p = sub.add_parser("scan-deps", help="Escanea manifiestos de dependencias (librerías cripto)")
+    deps_p.add_argument("target", type=Path, help="Directorio a escanear")
+    deps_p.add_argument("--rules", type=Path, default=DEFAULT_RULES, help="Paquete de detectores YAML")
+    deps_p.add_argument("--output", type=Path, default=None, help="Ruta de salida para cbom.json")
+    deps_p.add_argument("--fail-on", choices=["vulnerable", "at_risk", "unknown"], default=None,
+                        help="Modo CI: salir con código 1 si hay hallazgos de este nivel o peor.")
+    deps_p.add_argument("--quiet", action="store_true", help="No imprimir resumen en consola")
 
     pasv_p = sub.add_parser(
         "scan-passive",
@@ -225,7 +282,17 @@ def main(argv: list[str] | None = None) -> int:
     risk_p.add_argument("--shelf-life", type=int, default=10, help="X: vida útil del dato en años")
     risk_p.add_argument("--migration-time", type=int, default=5, help="Y: años de migración cripto")
     risk_p.add_argument("--qday", type=int, default=10, help="Z: años hasta el Q-day")
+    risk_p.add_argument("--fail-on", choices=["critical", "high", "medium", "low"], default=None,
+                        help="Modo CI: salir con código 1 si la banda de riesgo alcanza este nivel o peor.")
     risk_p.add_argument("--output", type=Path, default=None, help="Ruta de salida del informe JSON")
+
+    sc_p = sub.add_parser("scan-contracts", help="Analiza vulnerabilidades de smart contracts (Solidity)")
+    sc_p.add_argument("target", type=Path, help="Directorio con archivos .sol")
+    sc_p.add_argument("--rules", type=Path, default=DEFAULT_CONTRACT_RULES, help="Reglas de contratos YAML")
+    sc_p.add_argument("--output", type=Path, default=None, help="Ruta de salida del informe JSON")
+    sc_p.add_argument("--fail-on", choices=["critical", "high", "medium", "low", "info"], default=None,
+                      help="Modo CI: salir con código 1 si hay hallazgos de esta gravedad o peor.")
+    sc_p.add_argument("--quiet", action="store_true", help="No imprimir resumen en consola")
 
     kb_p = sub.add_parser("kb", help="Consulta la base de conocimiento de algoritmos")
     kb_p.add_argument("query", nargs="?", default=None, help="id o texto a buscar (vacío = listar todo)")
@@ -253,6 +320,7 @@ def main(argv: list[str] | None = None) -> int:
         _write_cbom(entries, output_path, str(args.target), args.rules.name, args.engine)
         if not args.quiet:
             _print_summary(entries)
+        return _ci_gate_entries(entries, args.fail_on)
 
     elif args.command == "scan-tls":
         output_path = args.output or Path(f"cbom_tls_{args.host}_{args.port}.json")
@@ -274,6 +342,28 @@ def main(argv: list[str] | None = None) -> int:
         _write_cbom(entries, output_path, str(args.target), args.rules.name, "keys[cryptography]")
         if not args.quiet:
             _print_summary(entries)
+        return _ci_gate_entries(entries, args.fail_on)
+
+    elif args.command == "scan-deps":
+        if not args.target.is_dir():
+            print(f"error: '{args.target}' no es un directorio", file=sys.stderr)
+            return 1
+        output_path = args.output or (args.target / "cbom_deps.json")
+        entries, deps = build_cbom_deps(args.target, args.rules, output_path=output_path)
+        _write_cbom(entries, output_path, str(args.target), args.rules.name, "deps[manifests]")
+        if not args.quiet:
+            if deps.crypto_libs:
+                print("\n=== Dependencias cripto-relevantes ===")
+                for lib in deps.crypto_libs[:20]:
+                    print(f"  · {lib}")
+            if deps.weak_libs:
+                print("\n=== Librerías a revisar (abandonadas / CVE conocida) ===")
+                for w in deps.weak_libs:
+                    print(f"  ⚠ {w}")
+            for note in deps.notes:
+                print(f"  {note}")
+            _print_summary(entries)
+        return _ci_gate_entries(entries, args.fail_on)
 
     elif args.command == "scan-passive":
         output_path = args.output or Path(f"cbom_passive_{args.domain}.json")
@@ -316,6 +406,33 @@ def main(argv: list[str] | None = None) -> int:
             args.output.write_text(json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8")
             print(f"Informe de riesgo escrito en: {args.output}")
         _print_risk(assessment)
+        if args.fail_on:
+            if _BAND_SEVERITY.get(assessment.risk_band, 0) >= _BAND_SEVERITY[args.fail_on]:
+                print(f"\n[CI] FALLO: banda de riesgo '{assessment.risk_band}' alcanza '{args.fail_on}' o peor.", file=sys.stderr)
+                return 1
+            print(f"\n[CI] OK: banda de riesgo '{assessment.risk_band}' por debajo de '{args.fail_on}'.")
+
+    elif args.command == "scan-contracts":
+        if not args.target.is_dir():
+            print(f"error: '{args.target}' no es un directorio", file=sys.stderr)
+            return 1
+        from .contract_scanner import ContractRuleSet, report as contract_report, scan_directory as scan_contracts
+        ruleset = ContractRuleSet.load(args.rules)
+        findings = scan_contracts(args.target, ruleset)
+        rep = contract_report(findings, str(args.target), ruleset.version)
+        output_path = args.output or (args.target / "contract_report.json")
+        output_path.write_text(json.dumps(rep, indent=2, ensure_ascii=False), encoding="utf-8")
+        print(f"Informe de contratos escrito en: {output_path}")
+        if not args.quiet:
+            _print_contracts(rep)
+        if args.fail_on:
+            from .contract_scanner import SEVERITY_ORDER
+            thr = SEVERITY_ORDER.index(args.fail_on)
+            worst = [f for f in findings if SEVERITY_ORDER.index(f.severity) <= thr]
+            if worst:
+                print(f"\n[CI] FALLO: {len(worst)} hallazgo(s) de gravedad '{args.fail_on}' o peor.", file=sys.stderr)
+                return 1
+            print(f"\n[CI] OK: sin hallazgos de gravedad '{args.fail_on}' o peor.")
 
     elif args.command == "kb":
         return _run_kb(args.query)

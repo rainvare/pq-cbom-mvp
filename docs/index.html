@@ -184,15 +184,17 @@
 <section id="evaluar">
   <div class="wrap">
     <p class="eyebrow">Qué se puede evaluar</p>
-    <h2>Cinco collectors, una base de conocimiento</h2>
+    <h2>Seis collectors, un analizador de contratos y modo CI</h2>
     <p class="sub">Cómo se invoca cada collector desde el código del repositorio.</p>
 
     <div class="tabs">
       <div class="tab active" data-tab="code">Código</div>
       <div class="tab" data-tab="keys">Claves / Certs</div>
+      <div class="tab" data-tab="deps">Dependencias</div>
       <div class="tab" data-tab="tls">Red / TLS</div>
       <div class="tab" data-tab="passive">Pasivo (CT · DNS · JWKS)</div>
-      <div class="tab" data-tab="risk">Riesgo + export</div>
+      <div class="tab" data-tab="contracts">Smart contracts</div>
+      <div class="tab" data-tab="risk">Riesgo · CI · export</div>
     </div>
 
     <div class="tab-body active" data-tab="code">
@@ -202,6 +204,14 @@
     <div class="tab-body" data-tab="keys">
       <div class="code">python -m pq_cbom.cli scan-keys ./mi-repo</div>
       <p class="note">Parsea certificados y claves reales (PEM/DER/SSH) y extrae el <b>tamaño de clave</b>: distingue RSA-1024 de RSA-4096 y marca las claves cortas. Es la dimensión que una simple búsqueda de texto no ve.</p>
+    </div>
+    <div class="tab-body" data-tab="deps">
+      <div class="code">python -m pq_cbom.cli scan-deps ./mi-repo</div>
+      <p class="note">Lee manifiestos (package.json, requirements.txt, go.mod, pom.xml, Cargo.toml…) y encuentra la cripto que entra por librería aunque no aparezca ningún algoritmo en el código. Marca librerías abandonadas o con CVE conocida (pycrypto, elliptic&lt;6.5.4, node-forge&lt;1.0…).</p>
+    </div>
+    <div class="tab-body" data-tab="contracts">
+      <div class="code">python -m pq_cbom.cli scan-contracts ./contracts --fail-on high</div>
+      <p class="note">Analizador de vulnerabilidades de smart contracts (Solidity) alineado con el SWC Registry: reentrancy, tx.origin, delegatecall, selfdestruct, aleatoriedad débil, overflow (&lt;0.8), y el puente cripto <code>ecrecover</code> → ECDSA secp256k1 (vulnerable a Shor). Heurística estática para revisión humana.</p>
     </div>
     <div class="tab-body" data-tab="tls">
       <div class="code">python -m pq_cbom.cli scan-tls ejemplo.com --port 443</div>
@@ -218,9 +228,10 @@ python -m pq_cbom.cli scan-passive ejemplo.com --authorize ejemplo.com</div>
       </p>
     </div>
     <div class="tab-body" data-tab="risk">
-      <div class="code">python -m pq_cbom.cli risk cbom.json --shelf-life 15 --migration-time 5 --qday 10
+      <div class="code">python -m pq_cbom.cli risk cbom.json --shelf-life 15 --qday 10 --fail-on high
+python -m pq_cbom.cli scan ./repo --fail-on vulnerable   # gate de CI
 python -m pq_cbom.cli export cbom.json --format cyclonedx --output bom.json</div>
-      <p class="note">Evaluación de riesgo agregada y export al estándar CycloneDX 1.6 para integrarlo con otras herramientas.</p>
+      <p class="note">Riesgo agregado (incluye tamaño de clave: marca RSA-1024 y claves cortas), <b>modo CI</b> (<code>--fail-on</code> devuelve código 1 para romper el build) y export a CycloneDX 1.6.</p>
     </div>
 
     <h3 style="margin:42px 0 8px; font-size:20px">Base de conocimiento de algoritmos</h3>

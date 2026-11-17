@@ -46,6 +46,8 @@ class RiskAssessment:
     counts_by_status: dict
     hndl_exposed: int            # hallazgos asimétricos vulnerables (rompibles por Shor)
     hndl_examples: list = field(default_factory=list)
+    short_keys: int = 0          # claves por debajo del tamaño mínimo (débiles ya hoy)
+    short_key_examples: list = field(default_factory=list)
     quantum_readiness: int = 100  # % de activos ya cuántico-seguros
     risk_index: int = 0           # 0 (bien) .. 100 (crítico)
     risk_band: str = "low"
@@ -124,6 +126,18 @@ def assess(
         for e in hndl[:10]
     ]
 
+    # Claves cortas: material con tamaño por debajo del mínimo (débil ya HOY,
+    # independientemente de lo cuántico). El collector lo marca en el snippet.
+    short = [
+        e for e in entries
+        if "CLAVE CORTA" in (getattr(e.finding, "snippet", "") or "")
+    ]
+    short_examples = [
+        {"rule_id": e.classification.rule_id, "location": e.finding.location,
+         "evidence": getattr(e.finding, "snippet", "")}
+        for e in short[:10]
+    ]
+
     # Índice de riesgo ponderado (presencia + volumen acotado).
     penalty = 0.0
     for status, weight in _STATUS_WEIGHT.items():
@@ -132,6 +146,8 @@ def assess(
             penalty += weight * min(c, _MAX_OCCURRENCES_COUNTED)
     # Recargo HNDL: lo asimétrico vulnerable pesa extra.
     penalty += 8 * min(len(hndl), 5)
+    # Recargo por claves cortas: débiles ya hoy, no solo frente a cuántica.
+    penalty += 6 * min(len(short), 5)
     risk_index = int(min(100, penalty))
 
     secure = counts.get("secure", 0)
@@ -149,6 +165,8 @@ def assess(
         counts_by_status=dict(counts),
         hndl_exposed=len(hndl),
         hndl_examples=hndl_examples,
+        short_keys=len(short),
+        short_key_examples=short_examples,
         quantum_readiness=readiness,
         risk_index=risk_index,
         risk_band=_risk_band(risk_index),
