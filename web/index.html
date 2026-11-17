@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>PQ-CBOM — Modelo cuántico de seguridad</title>
+  <meta name="description" content="Inventario y evaluación de riesgo criptográfico frente a la amenaza cuántica. Descubre qué algoritmos usa tu organización, cuáles rompe un computador cuántico y en qué orden migrar." />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+<nav>
+  <div class="wrap">
+    <div class="brand"><span class="dot"></span> PQ-CBOM</div>
+    <div class="nav-links">
+      <a href="#problema">Problema</a>
+      <a href="#solucion">Solución</a>
+      <a href="#demo">Demo</a>
+      <a href="#evaluar">Qué evalúa</a>
+      <a href="https://github.com/rainvare/pq-cbom-mvp">GitHub</a>
+    </div>
+  </div>
+</nav>
+
+<header class="hero">
+  <div class="wrap">
+    <span class="tag">Cryptographic Posture Management · Post-Quantum</span>
+    <h1>Sabe qué criptografía te rompe<br/><span class="grad">un computador cuántico</span></h1>
+    <p class="lead">
+      PQ-CBOM inventaría la criptografía de tu organización, la clasifica como segura
+      o vulnerable frente a un adversario cuántico, y te dice en qué orden migrar —
+      con evidencia auditable, no una consultoría de PowerPoint.
+    </p>
+    <div class="btns">
+      <a class="btn primary" href="#demo">Ver la demo del reporte</a>
+      <a class="btn ghost" href="#solucion">Cómo funciona</a>
+    </div>
+  </div>
+</header>
+
+<!-- PROBLEMA -->
+<section id="problema">
+  <div class="wrap">
+    <p class="eyebrow">El problema</p>
+    <h2>La criptografía que protege internet tiene fecha de caducidad</h2>
+    <p class="sub">
+      Un computador cuántico suficientemente grande romperá en tiempo polinomial
+      (algoritmo de Shor) la criptografía asimétrica que hoy protege casi todo el
+      tráfico seguro: RSA, ECDSA, Diffie-Hellman. No sabemos cuándo — pero migrar
+      la criptografía de una organización tarda años.
+    </p>
+    <div class="grid cols-3">
+      <div class="card">
+        <span class="ic">🔓</span>
+        <h3>Shor rompe lo asimétrico</h3>
+        <p>RSA, ECDSA, ECDH y Diffie-Hellman caen en tiempo polinomial. Es matemática, no fuerza bruta.</p>
+      </div>
+      <div class="card">
+        <span class="ic">⏳</span>
+        <h3>Migrar tarda años</h3>
+        <p>Identificar qué usa qué algoritmo, dónde y con qué prioridad es un proyecto de varios años.</p>
+      </div>
+      <div class="card">
+        <span class="ic">📡</span>
+        <h3>El riesgo ya empezó</h3>
+        <p>Tráfico interceptado hoy puede guardarse y descifrarse después. No hay que esperar al Q-day.</p>
+      </div>
+    </div>
+    <div class="hndl-box">
+      <h3>Harvest now, decrypt later</h3>
+      <p>
+        Un adversario captura y almacena <b>hoy</b> datos cifrados con criptografía clásica,
+        a la espera de un computador cuántico que los descifre mañana. Por eso el riesgo de
+        un dato depende de <b>cuántos años debe seguir siendo secreto</b>, no solo de cuándo
+        llegue el Q-day. Ese cálculo es el teorema de Mosca — y está en la demo.
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- SOLUCIÓN -->
+<section id="solucion">
+  <div class="wrap">
+    <p class="eyebrow">La solución</p>
+    <h2>Descubrimiento + clasificación determinista + modelo de riesgo</h2>
+    <p class="sub">
+      Un pipeline auditable, sin cajas negras ni decisiones en tiempo real. Tres
+      collectors alimentan una base de conocimiento única, y el resultado es un
+      inventario (CBOM) con prioridades accionables.
+    </p>
+    <div class="grid cols-3">
+      <div class="card">
+        <span class="ic">📂</span>
+        <h3>Collector de código</h3>
+        <p>Escanea el código fuente (regex o Semgrep AST) buscando uso de algoritmos criptográficos.</p>
+      </div>
+      <div class="card">
+        <span class="ic">🔐</span>
+        <h3>Collector de red (TLS)</h3>
+        <p>Inspecciona versiones TLS y el certificado de un host con sslyze.</p>
+      </div>
+      <div class="card">
+        <span class="ic">🛰️</span>
+        <h3>Descubrimiento pasivo</h3>
+        <p>Enumera superficie desde Certificate Transparency (crt.sh) sin tocar el objetivo, más TLS/cabeceras con autorización.</p>
+      </div>
+    </div>
+    <div class="grid cols-2" style="margin-top:18px">
+      <div class="card">
+        <span class="ic">📚</span>
+        <h3>Base de conocimiento</h3>
+        <p>La fuente de verdad: cada algoritmo con su impacto cuántico (Shor/Grover), bits de seguridad, estado NIST, estándar FIPS/RFC y reemplazo recomendado. Separada de la detección.</p>
+      </div>
+      <div class="card">
+        <span class="ic">📊</span>
+        <h3>Modelo de riesgo</h3>
+        <p>Agrega el inventario en preparación cuántica (% seguro), exposición HNDL, teorema de Mosca y una hoja de ruta por prioridad. Exportable a CycloneDX 1.6.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- DEMO -->
+<section id="demo">
+  <div class="wrap">
+    <p class="eyebrow">Demo en vivo</p>
+    <h2>El reporte, con datos reales del escáner</h2>
+    <p class="sub">
+      Este es el resultado de escanear un proyecto de ejemplo con el código del repo.
+      Mueve las barras del teorema de Mosca para ver cómo cambia el riesgo de tu organización.
+    </p>
+
+    <div class="kpis" id="kpis"></div>
+
+    <div class="grid cols-2">
+      <div class="panel">
+        <h3>Preparación cuántica</h3>
+        <div class="readiness">
+          <div class="donut" id="donut"><div class="inner"><div><div class="pct" id="donutPct">–</div><div class="lbl">cuántico-seguro</div></div></div></div>
+          <div id="statusBars" style="flex:1; min-width:220px"></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h3>Teorema de Mosca · harvest now, decrypt later</h3>
+        <div class="mosca-controls">
+          <div class="slider">
+            <label>X · vida útil del dato <b><span id="xv">10</span> años</b></label>
+            <input type="range" id="x" min="1" max="30" value="10" />
+          </div>
+          <div class="slider">
+            <label>Y · tiempo de migración <b><span id="yv">5</span> años</b></label>
+            <input type="range" id="y" min="1" max="15" value="5" />
+          </div>
+          <div class="slider">
+            <label>Z · años hasta Q-day <b><span id="zv">10</span> años</b></label>
+            <input type="range" id="z" min="1" max="30" value="10" />
+          </div>
+        </div>
+        <div class="mosca-eq" id="moscaEq"></div>
+        <div class="verdict" id="moscaVerdict"></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h3>Prioridad máxima — migrar primero (exposición HNDL)</h3>
+      <table>
+        <thead><tr><th>Algoritmo</th><th>Estado</th><th>Ubicación</th><th>Reemplazo recomendado</th></tr></thead>
+        <tbody id="topRisks"></tbody>
+      </table>
+    </div>
+
+    <div class="panel">
+      <h3>Hoja de ruta por banda de prioridad</h3>
+      <table>
+        <thead><tr><th>Banda</th><th>Hallazgos</th><th>Acción</th><th>Algoritmos</th></tr></thead>
+        <tbody id="roadmap"></tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- QUÉ EVALÚA -->
+<section id="evaluar">
+  <div class="wrap">
+    <p class="eyebrow">Qué se puede evaluar</p>
+    <h2>Tres fuentes, una base de conocimiento</h2>
+    <p class="sub">Cómo se invoca cada collector desde el código del repositorio.</p>
+
+    <div class="tabs">
+      <div class="tab active" data-tab="code">Código</div>
+      <div class="tab" data-tab="tls">Red / TLS</div>
+      <div class="tab" data-tab="passive">Pasivo (CT logs)</div>
+      <div class="tab" data-tab="risk">Riesgo + export</div>
+    </div>
+
+    <div class="tab-body active" data-tab="code">
+      <div class="code">python -m pq_cbom.cli scan ./mi-repo --engine semgrep --output cbom.json</div>
+      <p class="note">Escanea código fuente en 15+ lenguajes. El motor Semgrep evita falsos positivos de comentarios y strings.</p>
+    </div>
+    <div class="tab-body" data-tab="tls">
+      <div class="code">python -m pq_cbom.cli scan-tls ejemplo.com --port 443</div>
+      <p class="note">Reporta versiones TLS aceptadas y el tipo de clave del certificado del host.</p>
+    </div>
+    <div class="tab-body" data-tab="passive">
+      <div class="code">python -m pq_cbom.cli scan-passive ejemplo.com --ct-only
+python -m pq_cbom.cli scan-passive ejemplo.com --authorize ejemplo.com</div>
+      <p class="warn-note">
+        CT logs no contacta al objetivo (siempre seguro). La parte activa (TLS/cabeceras)
+        solo corre contra dominios autorizados explícitamente: esta herramienta evalúa
+        <b>tu propia</b> postura cripto o la de un cliente con permiso, no sistemas de terceros.
+      </p>
+    </div>
+    <div class="tab-body" data-tab="risk">
+      <div class="code">python -m pq_cbom.cli risk cbom.json --shelf-life 15 --migration-time 5 --qday 10
+python -m pq_cbom.cli export cbom.json --format cyclonedx --output bom.json</div>
+      <p class="note">Evaluación de riesgo agregada y export al estándar CycloneDX 1.6 para integrarlo con otras herramientas.</p>
+    </div>
+
+    <h3 style="margin:42px 0 8px; font-size:20px">Base de conocimiento de algoritmos</h3>
+    <p class="sub" style="margin-bottom:16px">Cada algoritmo que el motor conoce y clasifica. Busca por nombre, familia o estado.</p>
+    <input class="kb-search" id="kbSearch" placeholder="Buscar: RSA, Kyber, lattice, vulnerable, hash…" />
+    <div class="kb-table-wrap">
+      <table>
+        <thead><tr><th>Algoritmo</th><th>Familia</th><th>Estado PQ</th><th>Ataque</th><th>NIST</th><th>Reemplazo</th></tr></thead>
+        <tbody id="kbTable"></tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div>PQ-CBOM · Modelo cuántico de seguridad · MVP</div>
+    <div><a href="https://github.com/rainvare/pq-cbom-mvp">rainvare/pq-cbom-mvp</a></div>
+  </div>
+</footer>
+
+<script src="data/knowledge.js"></script>
+<script src="data/sample_cbom.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

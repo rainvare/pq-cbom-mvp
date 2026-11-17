@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections import Counter
 from pathlib import Path
 
-from . import scanner, semgrep_scanner, tls_scanner
+from . import passive_scanner, scanner, semgrep_scanner, tls_scanner
 from .priority import score as priority_score
 from .rules_engine import RuleSet
 from .scanner import RawMatch
@@ -84,3 +84,25 @@ def build_cbom_tls(
     ruleset = RuleSet.load(rules_path)
     raw_matches = tls_scanner.scan_host(hostname, port=port, ip_address=ip_address)
     return _assemble_entries(raw_matches, ruleset, detected_by="pq-cbom-mvp/tls-scanner[sslyze]")
+
+
+def build_cbom_passive(
+    domain: str,
+    rules_path: Path,
+    include_active: bool = True,
+    port: int = 443,
+    sample: int = 8,
+    authorized_scope: set[str] | None = None,
+) -> tuple[list[CBOMEntry], "passive_scanner.PassiveResult"]:
+    """Descubrimiento pasivo (CT logs + opcionalmente TLS/cabeceras) de la
+    superficie criptográfica de `domain`. Devuelve el CBOM y el PassiveResult
+    con el contexto para el reporte (hosts descubiertos, TLS negociado...).
+
+    La parte activa solo corre si `domain` está en `authorized_scope`."""
+    ruleset = RuleSet.load(rules_path)
+    result = passive_scanner.scan(
+        domain, ruleset.compiled_patterns(), include_active=include_active,
+        port=port, sample=sample, authorized_scope=authorized_scope,
+    )
+    entries = _assemble_entries(result.matches, ruleset, detected_by="pq-cbom-mvp/passive-scanner")
+    return entries, result
