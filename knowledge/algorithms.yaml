@@ -1,0 +1,723 @@
+# Base de conocimiento criptográfica — fuente de verdad del modelo de riesgo cuántico
+# ===================================================================================
+#
+# Este archivo es el activo central del producto: el "modelo cuántico de seguridad".
+# Describe CADA algoritmo de forma canónica y auditable, independientemente de cómo
+# se detecte (código, TLS, CT logs, cabeceras). Los detectores (rules/pq_rules.yaml,
+# collectors) solo mapean evidencia -> algorithm_id; la clasificación y el porqué
+# salen siempre de aquí.
+#
+# Campos por algoritmo:
+#   id             identificador canónico (coincide con el rule_id de los detectores)
+#   name           nombre legible
+#   family         asymmetric | symmetric | hash | mac | kdf | protocol
+#   primitive      para qué se usa (encryption, signature, key-exchange, kem, hashing...)
+#   math_problem   problema matemático subyacente (solo asimétrica/KEM)
+#   quantum_attack shor | grover | none   (algoritmo cuántico relevante)
+#   classical_bits seguridad efectiva clásica, en bits, en su parámetro común
+#   quantum_bits   seguridad efectiva frente a adversario cuántico, en bits
+#   pq_status      vulnerable | at_risk | secure | unknown  (ver abajo)
+#   nist_status    standardized | candidate | legacy | deprecated | disallowed
+#   standard       estándar de referencia (FIPS / RFC / SP)
+#   deprecate_by   fecha/hito de deprecación conocido (o null)
+#   replacement    reemplazo post-cuántico recomendado (o null si ya es seguro)
+#   rationale      justificación de la clasificación
+#   references     documentos de referencia
+#   aliases        otros nombres por los que se conoce (display / mapeo)
+#
+# Semántica de pq_status:
+#   vulnerable  roto en tiempo polinomial por Shor (asimétrico de factorización/DLP/ECC),
+#               o ya roto clásicamente (DES, MD5, RC4...). Migración urgente.
+#   at_risk     no roto, pero Grover reduce el margen a la mitad y queda insuficiente a
+#               largo plazo (AES-128, SHA-1-como-HMAC marginal, TLS 1.2 según suite).
+#   secure      resistente a adversario cuántico conocido (Grover con margen suficiente,
+#               o algoritmo post-cuántico estandarizado por NIST).
+#   unknown     detectado pero sin parámetro suficiente para clasificar (requiere triage).
+
+version: "2.0.0"
+
+algorithms:
+
+  # ======================================================================
+  # ASIMÉTRICA CLÁSICA — rota por Shor (factorización / logaritmo discreto)
+  # ======================================================================
+  - id: RSA
+    name: "RSA"
+    family: asymmetric
+    primitive: [encryption, signature, key-transport]
+    math_problem: integer-factorization
+    quantum_attack: shor
+    classical_bits: 112          # RSA-2048 ~= 112 bits de seguridad clásica
+    quantum_bits: 0
+    pq_status: vulnerable
+    nist_status: legacy
+    standard: "FIPS 186-5 / PKCS#1 (RFC 8017)"
+    deprecate_by: "2030 — disallowed 2035 (NIST IR 8547, borrador)"
+    replacement: "ML-KEM-768 (FIPS 203) para intercambio de claves; ML-DSA (FIPS 204) para firmas."
+    rationale: "Shor factoriza enteros en tiempo polinomial, rompiendo RSA de cualquier tamaño práctico."
+    references: ["FIPS 186-5", "NIST IR 8547", "RFC 8017"]
+    aliases: ["rsa", "PKCS#1", "RSASSA", "RSA-OAEP", "RSA-PSS"]
+
+  - id: DSA
+    name: "DSA (Digital Signature Algorithm)"
+    family: asymmetric
+    primitive: [signature]
+    math_problem: finite-field-discrete-log
+    quantum_attack: shor
+    classical_bits: 112
+    quantum_bits: 0
+    pq_status: vulnerable
+    nist_status: deprecated
+    standard: "FIPS 186-4 (retirado en FIPS 186-5 para generación)"
+    deprecate_by: "2023 — NIST ya no permite generación de claves DSA"
+    replacement: "ML-DSA (FIPS 204)."
+    rationale: "Shor resuelve el logaritmo discreto en campo finito en el que se basa DSA."
+    references: ["FIPS 186-5"]
+    aliases: ["dsa"]
+
+  - id: DH
+    name: "Diffie-Hellman (clásico, campo finito)"
+    family: asymmetric
+    primitive: [key-exchange]
+    math_problem: finite-field-discrete-log
+    quantum_attack: shor
+    classical_bits: 112
+    quantum_bits: 0
+    pq_status: vulnerable
+    nist_status: legacy
+    standard: "RFC 7919 (FFDHE)"
+    deprecate_by: "2030 (NIST IR 8547)"
+    replacement: "ML-KEM-768 (FIPS 203); híbrido durante la transición."
+    rationale: "Shor rompe el logaritmo discreto en el que se basa Diffie-Hellman clásico."
+    references: ["RFC 7919", "NIST IR 8547"]
+    aliases: ["diffie-hellman", "dh", "ffdhe", "modp"]
+
+  - id: ECDSA
+    name: "ECDSA"
+    family: asymmetric
+    primitive: [signature]
+    math_problem: elliptic-curve-discrete-log
+    quantum_attack: shor
+    classical_bits: 128          # P-256
+    quantum_bits: 0
+    pq_status: vulnerable
+    nist_status: legacy
+    standard: "FIPS 186-5"
+    deprecate_by: "2030 — disallowed 2035 (NIST IR 8547)"
+    replacement: "ML-DSA (FIPS 204) o SLH-DSA (FIPS 205)."
+    rationale: "Shor rompe el logaritmo discreto de curva elíptica."
+    references: ["FIPS 186-5", "NIST IR 8547"]
+    aliases: ["ecdsa", "secp256r1-sig"]
+
+  - id: ECDH
+    name: "ECDH / X25519 / X448"
+    family: asymmetric
+    primitive: [key-exchange]
+    math_problem: elliptic-curve-discrete-log
+    quantum_attack: shor
+    classical_bits: 128
+    quantum_bits: 0
+    pq_status: vulnerable
+    nist_status: legacy
+    standard: "SP 800-56A / RFC 7748 (X25519/X448)"
+    deprecate_by: "2030 (NIST IR 8547)"
+    replacement: "ML-KEM-768 (FIPS 203); híbrido X25519+ML-KEM durante la transición."
+    rationale: "Shor rompe el logaritmo discreto de curva elíptica, incluido Curve25519."
+    references: ["SP 800-56A", "RFC 7748", "NIST IR 8547"]
+    aliases: ["ecdh", "x25519", "x448", "curve25519", "ecdhe"]
+
+  - id: Ed25519
+    name: "EdDSA (Ed25519 / Ed448)"
+    family: asymmetric
+    primitive: [signature]
+    math_problem: elliptic-curve-discrete-log
+    quantum_attack: shor
+    classical_bits: 128
+    quantum_bits: 0
+    pq_status: vulnerable
+    nist_status: legacy
+    standard: "FIPS 186-5 / RFC 8032"
+    deprecate_by: "2030 (NIST IR 8547)"
+    replacement: "ML-DSA (FIPS 204) o SLH-DSA (FIPS 205)."
+    rationale: "Firma sobre curva de Edwards; Shor rompe el logaritmo discreto subyacente."
+    references: ["RFC 8032", "FIPS 186-5"]
+    aliases: ["ed25519", "ed448", "eddsa"]
+
+  - id: ECC-GENERIC
+    name: "Criptografía de curva elíptica (genérica)"
+    family: asymmetric
+    primitive: [signature, key-exchange]
+    math_problem: elliptic-curve-discrete-log
+    quantum_attack: shor
+    classical_bits: 128
+    quantum_bits: 0
+    pq_status: vulnerable
+    nist_status: legacy
+    standard: "SP 800-186 (curvas aprobadas)"
+    deprecate_by: "2030 (NIST IR 8547)"
+    replacement: "ML-KEM (intercambio) o ML-DSA/SLH-DSA (firmas)."
+    rationale: "Cualquier esquema sobre curva elíptica es vulnerable a Shor."
+    references: ["SP 800-186", "NIST IR 8547"]
+    aliases: ["ecc", "secp256k1", "secp256r1", "secp384r1", "secp521r1", "p-256", "p-384", "p-521", "prime256v1"]
+
+  - id: ElGamal
+    name: "ElGamal"
+    family: asymmetric
+    primitive: [encryption]
+    math_problem: finite-field-discrete-log
+    quantum_attack: shor
+    classical_bits: 112
+    quantum_bits: 0
+    pq_status: vulnerable
+    nist_status: legacy
+    standard: "No estandarizado por NIST (uso histórico en PGP)"
+    deprecate_by: "n/a"
+    replacement: "ML-KEM-768 (FIPS 203)."
+    rationale: "Cifrado basado en logaritmo discreto; Shor lo rompe en tiempo polinomial."
+    references: []
+    aliases: ["elgamal"]
+
+  # ======================================================================
+  # POST-CUÁNTICA — estandarizada por NIST (segura)
+  # ======================================================================
+  - id: ML-KEM
+    name: "ML-KEM (Kyber)"
+    family: asymmetric
+    primitive: [kem, key-exchange]
+    math_problem: module-lwe
+    quantum_attack: none
+    classical_bits: 192          # ML-KEM-768 (categoría NIST 3)
+    quantum_bits: 192
+    pq_status: secure
+    nist_status: standardized
+    standard: "FIPS 203 (agosto 2024)"
+    deprecate_by: null
+    replacement: null
+    rationale: "Encapsulado de clave basado en retículos (Module-LWE); sin ataque cuántico conocido."
+    references: ["FIPS 203"]
+    aliases: ["ml-kem", "kyber", "mlkem", "ml-kem-512", "ml-kem-768", "ml-kem-1024", "crystals-kyber"]
+
+  - id: ML-DSA
+    name: "ML-DSA (Dilithium)"
+    family: asymmetric
+    primitive: [signature]
+    math_problem: module-lwe
+    quantum_attack: none
+    classical_bits: 192
+    quantum_bits: 192
+    pq_status: secure
+    nist_status: standardized
+    standard: "FIPS 204 (agosto 2024)"
+    deprecate_by: null
+    replacement: null
+    rationale: "Firma digital basada en retículos (Module-LWE); sin ataque cuántico conocido."
+    references: ["FIPS 204"]
+    aliases: ["ml-dsa", "dilithium", "mldsa", "crystals-dilithium"]
+
+  - id: SLH-DSA
+    name: "SLH-DSA (SPHINCS+)"
+    family: asymmetric
+    primitive: [signature]
+    math_problem: hash-based
+    quantum_attack: grover        # solo afecta al hash interno, con margen suficiente
+    classical_bits: 128
+    quantum_bits: 128
+    pq_status: secure
+    nist_status: standardized
+    standard: "FIPS 205 (agosto 2024)"
+    deprecate_by: null
+    replacement: null
+    rationale: "Firma basada en hash; su seguridad se reduce a la del hash, resistente a cuántica con margen."
+    references: ["FIPS 205"]
+    aliases: ["slh-dsa", "sphincs", "sphincs+", "sphincsplus"]
+
+  - id: FN-DSA
+    name: "FN-DSA (FALCON)"
+    family: asymmetric
+    primitive: [signature]
+    math_problem: ntru-lattice
+    quantum_attack: none
+    classical_bits: 128
+    quantum_bits: 128
+    pq_status: secure
+    nist_status: standardized      # seleccionado; borrador FIPS 206 en progreso
+    standard: "FIPS 206 (en borrador)"
+    deprecate_by: null
+    replacement: null
+    rationale: "Firma compacta basada en retículos NTRU; seleccionada por NIST para estandarización."
+    references: ["NIST PQC — FALCON", "FIPS 206 (draft)"]
+    aliases: ["fn-dsa", "falcon"]
+
+  # ======================================================================
+  # POST-CUÁNTICA — candidatos / en estandarización (seguros pero no finales)
+  # ======================================================================
+  - id: HQC
+    name: "HQC"
+    family: asymmetric
+    primitive: [kem]
+    math_problem: code-based
+    quantum_attack: none
+    classical_bits: 128
+    quantum_bits: 128
+    pq_status: secure
+    nist_status: candidate
+    standard: "NIST — seleccionado marzo 2025 (4ª ronda), FIPS en progreso"
+    deprecate_by: null
+    replacement: null
+    rationale: "KEM basado en códigos; seleccionado por NIST como respaldo de ML-KEM (base matemática distinta)."
+    references: ["NIST PQC 4th round"]
+    aliases: ["hqc"]
+
+  - id: Classic-McEliece
+    name: "Classic McEliece"
+    family: asymmetric
+    primitive: [kem]
+    math_problem: code-based
+    quantum_attack: none
+    classical_bits: 128
+    quantum_bits: 128
+    pq_status: secure
+    nist_status: candidate
+    standard: "NIST PQC — 4ª ronda (en evaluación)"
+    deprecate_by: null
+    replacement: null
+    rationale: "KEM basado en códigos de Goppa; muy conservador, clave pública grande."
+    references: ["NIST PQC 4th round"]
+    aliases: ["mceliece", "classic-mceliece"]
+
+  - id: BIKE
+    name: "BIKE"
+    family: asymmetric
+    primitive: [kem]
+    math_problem: code-based
+    quantum_attack: none
+    classical_bits: 128
+    quantum_bits: 128
+    pq_status: secure
+    nist_status: candidate
+    standard: "NIST PQC — 4ª ronda (no seleccionado finalmente frente a HQC)"
+    deprecate_by: null
+    replacement: null
+    rationale: "KEM basado en códigos QC-MDPC; evaluado por NIST en la 4ª ronda."
+    references: ["NIST PQC 4th round"]
+    aliases: ["bike"]
+
+  - id: NTRU
+    name: "NTRU"
+    family: asymmetric
+    primitive: [kem]
+    math_problem: ntru-lattice
+    quantum_attack: none
+    classical_bits: 128
+    quantum_bits: 128
+    pq_status: secure
+    nist_status: candidate
+    standard: "Finalista NIST PQC (no estandarizado; base de FALCON)"
+    deprecate_by: null
+    replacement: null
+    rationale: "KEM basado en retículos NTRU; sin ataque cuántico conocido."
+    references: ["NIST PQC round 3"]
+    aliases: ["ntru"]
+
+  - id: FrodoKEM
+    name: "FrodoKEM"
+    family: asymmetric
+    primitive: [kem]
+    math_problem: plain-lwe
+    quantum_attack: none
+    classical_bits: 128
+    quantum_bits: 128
+    pq_status: secure
+    nist_status: candidate
+    standard: "ISO/IEC — conservador, sin estructura de retículo"
+    deprecate_by: null
+    replacement: null
+    rationale: "KEM basado en LWE plano (sin estructura algebraica); conservador, más lento."
+    references: ["FrodoKEM spec"]
+    aliases: ["frodo", "frodokem"]
+
+  # ======================================================================
+  # SIMÉTRICA — Grover reduce la seguridad efectiva a la mitad
+  # ======================================================================
+  - id: AES-256
+    name: "AES-256"
+    family: symmetric
+    primitive: [encryption]
+    math_problem: null
+    quantum_attack: grover
+    classical_bits: 256
+    quantum_bits: 128
+    pq_status: secure
+    nist_status: standardized
+    standard: "FIPS 197"
+    deprecate_by: null
+    replacement: null
+    rationale: "Grover deja ~128 bits efectivos, considerado suficiente a largo plazo."
+    references: ["FIPS 197", "NIST IR 8547"]
+    aliases: ["aes-256", "aes256", "aes_256"]
+
+  - id: AES-128
+    name: "AES-128"
+    family: symmetric
+    primitive: [encryption]
+    math_problem: null
+    quantum_attack: grover
+    classical_bits: 128
+    quantum_bits: 64
+    pq_status: at_risk
+    nist_status: standardized
+    standard: "FIPS 197"
+    deprecate_by: "Revisar a largo plazo; preferir AES-256 para datos de vida útil larga"
+    replacement: "AES-256 o ChaCha20-Poly1305 (clave de 256 bits)."
+    rationale: "Grover reduce la seguridad efectiva a ~64 bits, margen insuficiente a largo plazo."
+    references: ["FIPS 197"]
+    aliases: ["aes-128", "aes128", "aes_128"]
+
+  - id: AES-GENERIC
+    name: "AES (tamaño de clave no identificado)"
+    family: symmetric
+    primitive: [encryption]
+    math_problem: null
+    quantum_attack: grover
+    classical_bits: null
+    quantum_bits: null
+    pq_status: unknown
+    nist_status: standardized
+    standard: "FIPS 197"
+    deprecate_by: null
+    replacement: "Confirmar longitud de clave; usar AES-256."
+    rationale: "AES detectado sin tamaño de clave; no clasificable sin confirmar longitud."
+    references: ["FIPS 197"]
+    aliases: ["aes"]
+
+  - id: ChaCha20
+    name: "ChaCha20-Poly1305"
+    family: symmetric
+    primitive: [encryption]
+    math_problem: null
+    quantum_attack: grover
+    classical_bits: 256
+    quantum_bits: 128
+    pq_status: secure
+    nist_status: standardized
+    standard: "RFC 8439"
+    deprecate_by: null
+    replacement: null
+    rationale: "Cifrador de flujo de 256 bits; Grover deja ~128 bits efectivos, suficiente."
+    references: ["RFC 8439"]
+    aliases: ["chacha20", "chacha20-poly1305"]
+
+  - id: Camellia
+    name: "Camellia"
+    family: symmetric
+    primitive: [encryption]
+    math_problem: null
+    quantum_attack: grover
+    classical_bits: 256          # Camellia-256
+    quantum_bits: 128
+    pq_status: secure
+    nist_status: legacy
+    standard: "RFC 3713"
+    deprecate_by: null
+    replacement: null
+    rationale: "Cifrador de bloque de hasta 256 bits; comportamiento frente a Grover análogo a AES."
+    references: ["RFC 3713"]
+    aliases: ["camellia"]
+
+  - id: DES
+    name: "DES"
+    family: symmetric
+    primitive: [encryption]
+    math_problem: null
+    quantum_attack: grover
+    classical_bits: 56
+    quantum_bits: 28
+    pq_status: vulnerable
+    nist_status: disallowed
+    standard: "FIPS 46-3 (retirado)"
+    deprecate_by: "Retirado en 2005"
+    replacement: "AES-256."
+    rationale: "Ya roto por fuerza bruta clásica (56 bits); irrelevante el adversario cuántico."
+    references: ["NIST SP 800-131A"]
+    aliases: ["des"]
+
+  - id: 3DES
+    name: "Triple DES (3DES)"
+    family: symmetric
+    primitive: [encryption]
+    math_problem: null
+    quantum_attack: grover
+    classical_bits: 112
+    quantum_bits: 56
+    pq_status: vulnerable
+    nist_status: disallowed
+    standard: "SP 800-67 (disallowed desde 2024)"
+    deprecate_by: "Disallowed 2024 (NIST SP 800-131A Rev.2)"
+    replacement: "AES-256."
+    rationale: "Seguridad efectiva ~112 bits ya débil clásicamente (Sweet32); Grover la reduce más."
+    references: ["SP 800-131A", "SP 800-67"]
+    aliases: ["3des", "tripledes", "des3", "des-ede3"]
+
+  - id: RC4
+    name: "RC4"
+    family: symmetric
+    primitive: [encryption]
+    math_problem: null
+    quantum_attack: none
+    classical_bits: 0
+    quantum_bits: 0
+    pq_status: vulnerable
+    nist_status: disallowed
+    standard: "Prohibido en TLS (RFC 7465)"
+    deprecate_by: "Prohibido 2015 (RFC 7465)"
+    replacement: "ChaCha20-Poly1305 o AES-256-GCM."
+    rationale: "Cifrador de flujo roto por criptoanálisis clásico; sesgo de keystream explotable."
+    references: ["RFC 7465"]
+    aliases: ["rc4", "arc4"]
+
+  - id: Blowfish
+    name: "Blowfish"
+    family: symmetric
+    primitive: [encryption]
+    math_problem: null
+    quantum_attack: grover
+    classical_bits: 64           # tamaño de bloque de 64 bits -> Sweet32
+    quantum_bits: 32
+    pq_status: vulnerable
+    nist_status: legacy
+    standard: "No estandarizado por NIST"
+    deprecate_by: "Evitar: bloque de 64 bits vulnerable a Sweet32"
+    replacement: "AES-256 o ChaCha20-Poly1305."
+    rationale: "Bloque de 64 bits vulnerable a ataques de colisión de bloque (Sweet32) clásicamente."
+    references: ["CVE-2016-2183 (Sweet32)"]
+    aliases: ["blowfish"]
+
+  # ======================================================================
+  # HASH — Grover afecta preimagen; colisiones ya rotas clásicamente en legados
+  # ======================================================================
+  - id: MD5
+    name: "MD5"
+    family: hash
+    primitive: [hashing]
+    math_problem: null
+    quantum_attack: grover
+    classical_bits: 0
+    quantum_bits: 0
+    pq_status: vulnerable
+    nist_status: disallowed
+    standard: "RFC 1321 (no apto para seguridad)"
+    deprecate_by: "Roto para colisiones desde 2004"
+    replacement: "SHA-256 o SHA-3-256."
+    rationale: "Colisiones prácticas clásicas conocidas; no depende de un adversario cuántico."
+    references: ["RFC 6151"]
+    aliases: ["md5"]
+
+  - id: SHA1
+    name: "SHA-1"
+    family: hash
+    primitive: [hashing]
+    math_problem: null
+    quantum_attack: grover
+    classical_bits: 0
+    quantum_bits: 0
+    pq_status: vulnerable
+    nist_status: disallowed
+    standard: "FIPS 180-4 (disallowed desde 2030 para firmas; roto antes)"
+    deprecate_by: "Colisión práctica (SHAttered, 2017); prohibido por NIST 2030"
+    replacement: "SHA-256 o SHA-3-256."
+    rationale: "Colisiones prácticas demostradas (SHAttered); no depende de cuántica."
+    references: ["NIST SP 800-131A", "SHAttered 2017"]
+    aliases: ["sha1", "sha-1"]
+
+  - id: SHA-256
+    name: "SHA-256 / SHA-512"
+    family: hash
+    primitive: [hashing]
+    math_problem: null
+    quantum_attack: grover
+    classical_bits: 256
+    quantum_bits: 128
+    pq_status: secure
+    nist_status: standardized
+    standard: "FIPS 180-4"
+    deprecate_by: null
+    replacement: null
+    rationale: "Grover reduce la resistencia a preimagen a ~128 bits, considerado suficiente."
+    references: ["FIPS 180-4"]
+    aliases: ["sha-256", "sha256", "sha-384", "sha-512", "sha512", "sha2"]
+
+  - id: SHA-3
+    name: "SHA-3 / SHAKE"
+    family: hash
+    primitive: [hashing]
+    math_problem: null
+    quantum_attack: grover
+    classical_bits: 256
+    quantum_bits: 128
+    pq_status: secure
+    nist_status: standardized
+    standard: "FIPS 202"
+    deprecate_by: null
+    replacement: null
+    rationale: "Construcción esponja (Keccak); SHA-3-256/512 mantienen margen frente a Grover."
+    references: ["FIPS 202"]
+    aliases: ["sha-3", "sha3", "keccak", "shake128", "shake256"]
+
+  - id: BLAKE2
+    name: "BLAKE2 / BLAKE3"
+    family: hash
+    primitive: [hashing]
+    math_problem: null
+    quantum_attack: grover
+    classical_bits: 256
+    quantum_bits: 128
+    pq_status: secure
+    nist_status: legacy
+    standard: "RFC 7693 (BLAKE2)"
+    deprecate_by: null
+    replacement: null
+    rationale: "Hash moderno de 256+ bits; margen suficiente frente a Grover."
+    references: ["RFC 7693"]
+    aliases: ["blake2", "blake2b", "blake2s", "blake3"]
+
+  # ======================================================================
+  # KDF / HASH DE CONTRASEÑAS — relevantes para almacenamiento, no cuántico-críticos
+  # ======================================================================
+  - id: PBKDF2
+    name: "PBKDF2"
+    family: kdf
+    primitive: [password-hashing, key-derivation]
+    math_problem: null
+    quantum_attack: grover
+    classical_bits: null
+    quantum_bits: null
+    pq_status: at_risk
+    nist_status: standardized
+    standard: "SP 800-132 / RFC 8018"
+    deprecate_by: "Preferir Argon2/scrypt para nuevas aplicaciones"
+    replacement: "Argon2id o scrypt con parámetros de coste altos."
+    rationale: "Aceptable con muchas iteraciones, pero sin dureza de memoria; margen reducido frente a hardware masivo."
+    references: ["SP 800-132", "RFC 8018"]
+    aliases: ["pbkdf2"]
+
+  - id: bcrypt
+    name: "bcrypt"
+    family: kdf
+    primitive: [password-hashing]
+    math_problem: null
+    quantum_attack: grover
+    classical_bits: null
+    quantum_bits: null
+    pq_status: secure
+    nist_status: legacy
+    standard: "De facto (OpenBSD)"
+    deprecate_by: null
+    replacement: null
+    rationale: "Hash de contraseñas con factor de coste; no es una primitiva cuántico-crítica."
+    references: []
+    aliases: ["bcrypt"]
+
+  - id: Argon2
+    name: "Argon2"
+    family: kdf
+    primitive: [password-hashing]
+    math_problem: null
+    quantum_attack: grover
+    classical_bits: null
+    quantum_bits: null
+    pq_status: secure
+    nist_status: legacy
+    standard: "RFC 9106 (ganador PHC)"
+    deprecate_by: null
+    replacement: null
+    rationale: "Hash de contraseñas con dureza de memoria; estado del arte, no cuántico-crítico."
+    references: ["RFC 9106"]
+    aliases: ["argon2", "argon2id", "argon2i"]
+
+  # ======================================================================
+  # PROTOCOLOS
+  # ======================================================================
+  - id: TLS1.0
+    name: "TLS 1.0 / SSLv3"
+    family: protocol
+    primitive: [transport]
+    math_problem: null
+    quantum_attack: shor
+    classical_bits: null
+    quantum_bits: 0
+    pq_status: vulnerable
+    nist_status: disallowed
+    standard: "RFC 8996 (deprecado)"
+    deprecate_by: "Deprecado 2021 (RFC 8996)"
+    replacement: "TLS 1.3 con key-exchange híbrido PQC (X25519MLKEM768)."
+    rationale: "Protocolo obsoleto; negocia suites RSA/ECDHE clásicas rotas por Shor."
+    references: ["RFC 8996"]
+    aliases: ["tls1.0", "tlsv1.0", "sslv3", "ssl3"]
+
+  - id: TLS1.1
+    name: "TLS 1.1"
+    family: protocol
+    primitive: [transport]
+    math_problem: null
+    quantum_attack: shor
+    classical_bits: null
+    quantum_bits: 0
+    pq_status: vulnerable
+    nist_status: disallowed
+    standard: "RFC 8996 (deprecado)"
+    deprecate_by: "Deprecado 2021 (RFC 8996)"
+    replacement: "TLS 1.3 con key-exchange híbrido PQC."
+    rationale: "Protocolo obsoleto; negocia suites RSA/ECDHE clásicas rotas por Shor."
+    references: ["RFC 8996"]
+    aliases: ["tls1.1", "tlsv1.1"]
+
+  - id: TLS1.2
+    name: "TLS 1.2"
+    family: protocol
+    primitive: [transport]
+    math_problem: null
+    quantum_attack: shor
+    classical_bits: null
+    quantum_bits: 0
+    pq_status: at_risk
+    nist_status: legacy
+    standard: "RFC 5246"
+    deprecate_by: "Migrar a TLS 1.3 con PQC"
+    replacement: "Forzar TLS 1.3 con key-exchange híbrido PQC."
+    rationale: "Soporta suites con intercambio RSA/ECDHE clásico; depende de la suite negociada."
+    references: ["RFC 5246"]
+    aliases: ["tls1.2", "tlsv1.2"]
+
+  - id: TLS1.3
+    name: "TLS 1.3"
+    family: protocol
+    primitive: [transport]
+    math_problem: null
+    quantum_attack: shor
+    classical_bits: null
+    quantum_bits: null
+    pq_status: unknown
+    nist_status: standardized
+    standard: "RFC 8446"
+    deprecate_by: null
+    replacement: "Confirmar key-exchange híbrido (X25519MLKEM768) u otro KEM PQC."
+    rationale: "TLS 1.3 no es vulnerable en sí; el estado PQC depende del key-exchange negociado (clásico vs. híbrido)."
+    references: ["RFC 8446", "draft-ietf-tls-hybrid-design"]
+    aliases: ["tls1.3", "tlsv1.3"]
+
+  - id: SSHv1
+    name: "SSH protocolo 1"
+    family: protocol
+    primitive: [transport]
+    math_problem: null
+    quantum_attack: shor
+    classical_bits: null
+    quantum_bits: 0
+    pq_status: vulnerable
+    nist_status: disallowed
+    standard: "Obsoleto"
+    deprecate_by: "Obsoleto hace décadas"
+    replacement: "SSH v2 con key-exchange PQC (sntrup761x25519 / mlkem768x25519)."
+    rationale: "Protocolo roto clásicamente; no debe usarse."
+    references: []
+    aliases: ["ssh-1", "sshv1", "ssh protocol 1"]

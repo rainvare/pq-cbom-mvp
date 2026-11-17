@@ -34,6 +34,21 @@ EXPECTED_STATUS = {
     "TLS1.1": "vulnerable",
     "TLS1.2": "at_risk",
     "TLS1.3": "unknown",
+    # --- Añadidos en v2.0 (clasificación desde knowledge/algorithms.yaml) ---
+    "ElGamal": "vulnerable",
+    "FN-DSA": "secure",
+    "HQC": "secure",
+    "Classic-McEliece": "secure",
+    "BIKE": "secure",
+    "NTRU": "secure",
+    "FrodoKEM": "secure",
+    "Camellia": "secure",
+    "Blowfish": "vulnerable",
+    "BLAKE2": "secure",
+    "PBKDF2": "at_risk",
+    "bcrypt": "secure",
+    "Argon2": "secure",
+    "SSHv1": "vulnerable",
 }
 
 

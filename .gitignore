@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+cbom*.json
+.pytest_cache/

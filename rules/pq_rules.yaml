@@ -1,195 +1,105 @@
-# Paquete de reglas de clasificación post-cuántica
+# Paquete de DETECTORES (solo detección)
+# =======================================
+# Cada detector mapea evidencia de texto -> algorithm_id. La CLASIFICACIÓN
+# (pq_status, rationale, replacement, impacto cuántico, estado NIST...) NO vive
+# aquí: sale de knowledge/algorithms.yaml, indexada por ese mismo id.
 #
-# pq_status:
-#   vulnerable   -> roto en tiempo polinomial por el algoritmo de Shor (asimétrico
-#                   basado en factorización / logaritmo discreto / curvas elípticas)
-#   at_risk      -> no roto, pero la seguridad efectiva se reduce a la mitad por el
-#                   algoritmo de Grover (simétrico/hash con margen insuficiente)
-#   secure       -> resistente a adversario cuántico conocido (Grover con margen
-#                   suficiente, o algoritmo post-cuántico NIST)
-#   unknown      -> detectado pero sin regla de clasificación (requiere triage manual)
-#
-# El "id" y "version" del paquete quedan grabados en cada hallazgo del CBOM.
+# Formato de cada detector:
+#   id     identificador canónico; debe existir en la base de conocimiento
+#   match  lista de patrones regex (case-insensitive) que evidencian su uso
+# (`category` es opcional; si se omite se toma la `family` de la base de conocimiento)
 
-version: "1.0.0"
+version: "2.0.0"
 
 rules:
-  # --- Asimétrica: factorización / logaritmo discreto (rotos por Shor) ---
+  # --- Asimétrica clásica (rota por Shor) ---
   - id: RSA
-    category: asymmetric
     match: ["\\bRSA\\b", "rsa\\.generate_private_key", "RSA\\.generate", "RSA_generate_key", "RsaKeyGenParameterSpec"]
-    pq_status: vulnerable
-    rationale: "Shor rompe en tiempo polinomial la factorización de enteros en la que se basa RSA."
-    replacement: "ML-KEM-768 (FIPS 203) para intercambio de claves; ML-DSA (FIPS 204) para firmas."
-
   - id: DSA
-    category: asymmetric
     match: ["\\bDSA\\b(?!\\w)", "DSA\\.generate"]
-    pq_status: vulnerable
-    rationale: "Shor rompe el logaritmo discreto en el que se basa DSA."
-    replacement: "ML-DSA (FIPS 204)."
-
   - id: DH
-    category: asymmetric
     match: ["Diffie-?Hellman", "\\bDH\\b(?!\\w)", "DHParameterSpec"]
-    pq_status: vulnerable
-    rationale: "Shor rompe el logaritmo discreto en el que se basa Diffie-Hellman clásico."
-    replacement: "ML-KEM-768 (FIPS 203)."
-
   - id: ECDSA
-    category: asymmetric
     match: ["ECDSA", "SigningKey\\.generate"]
-    pq_status: vulnerable
-    rationale: "Shor rompe el logaritmo discreto de curva elíptica."
-    replacement: "ML-DSA (FIPS 204) o SLH-DSA (FIPS 205)."
-
   - id: ECDH
-    category: asymmetric
     match: ["\\bECDH\\b", "X25519", "X448"]
-    pq_status: vulnerable
-    rationale: "Shor rompe el logaritmo discreto de curva elíptica (incluye Curve25519/X25519)."
-    replacement: "ML-KEM-768 (FIPS 203), o híbrido X25519+ML-KEM durante la transición."
-
   - id: Ed25519
-    category: asymmetric
     match: ["Ed25519", "Ed448"]
-    pq_status: vulnerable
-    rationale: "Firma basada en curva elíptica; Shor rompe el logaritmo discreto subyacente."
-    replacement: "ML-DSA (FIPS 204) o SLH-DSA (FIPS 205)."
-
   - id: ECC-GENERIC
-    category: asymmetric
     match: ["elliptic.?curve", "\\bECC\\b(?!\\w)", "secp256k1", "secp256r1", "P-256", "P-384", "P-521", "prime256v1"]
-    pq_status: vulnerable
-    rationale: "Cualquier esquema de curva elíptica es vulnerable a Shor."
-    replacement: "Ver ML-KEM (intercambio de claves) o ML-DSA (firmas)."
+  - id: ElGamal
+    match: ["ElGamal"]
 
-  # --- Post-cuántica NIST (segura) ---
+  # --- Post-cuántica NIST estandarizada (segura) ---
   - id: ML-KEM
-    category: asymmetric
-    match: ["ML-KEM", "Kyber"]
-    pq_status: secure
-    rationale: "Mecanismo de encapsulado de clave basado en retículos, estandarizado en FIPS 203."
-    replacement: null
-
+    match: ["ML-KEM", "Kyber", "CRYSTALS-Kyber"]
   - id: ML-DSA
-    category: asymmetric
-    match: ["ML-DSA", "Dilithium"]
-    pq_status: secure
-    rationale: "Firma digital basada en retículos, estandarizada en FIPS 204."
-    replacement: null
-
+    match: ["ML-DSA", "Dilithium", "CRYSTALS-Dilithium"]
   - id: SLH-DSA
-    category: asymmetric
     match: ["SLH-DSA", "SPHINCS\\+?"]
-    pq_status: secure
-    rationale: "Firma digital basada en hash, estandarizada en FIPS 205."
-    replacement: null
+  - id: FN-DSA
+    match: ["FN-DSA", "\\bFalcon\\b"]
 
-  # --- Simétrica (Grover reduce la seguridad efectiva a la mitad) ---
+  # --- Post-cuántica candidatos / en estandarización ---
+  - id: HQC
+    match: ["\\bHQC\\b"]
+  - id: Classic-McEliece
+    match: ["McEliece"]
+  - id: BIKE
+    match: ["\\bBIKE\\b"]
+  - id: NTRU
+    match: ["\\bNTRU\\b"]
+  - id: FrodoKEM
+    match: ["Frodo(KEM)?"]
+
+  # --- Simétrica ---
   - id: AES-256
-    category: symmetric
     match: ["AES-?256", "AES\\.new\\([^)]*32", "AES_256"]
-    pq_status: secure
-    rationale: "Grover reduce la seguridad efectiva a ~128 bits, considerado suficiente."
-    replacement: null
-
   - id: AES-128
-    category: symmetric
     match: ["AES-?128", "AES_128"]
-    pq_status: at_risk
-    rationale: "Grover reduce la seguridad efectiva a ~64 bits, margen insuficiente a largo plazo."
-    replacement: "Migrar a AES-256 o ChaCha20-Poly1305 con clave de 256 bits."
-
   - id: AES-GENERIC
-    category: symmetric
     match: ["\\bAES\\b(?!-?(128|256))"]
-    pq_status: unknown
-    rationale: "Se detectó AES sin tamaño de clave identificable; no se puede clasificar sin confirmar longitud de clave."
-    replacement: "Confirmar longitud de clave; usar AES-256."
-
   - id: ChaCha20
-    category: symmetric
     match: ["ChaCha20"]
-    pq_status: secure
-    rationale: "Cifrador de flujo de 256 bits; Grover deja ~128 bits efectivos, suficiente."
-    replacement: null
-
+  - id: Camellia
+    match: ["Camellia"]
   - id: DES
-    category: symmetric
     match: ["\\bDES\\b(?!\\w)", "DES\\.new"]
-    pq_status: vulnerable
-    rationale: "Ya roto por fuerza bruta clásica (56 bits); irrelevante si es pre o post-cuántico."
-    replacement: "AES-256."
-
   - id: 3DES
-    category: symmetric
-    match: ["3DES", "TripleDES", "DES3"]
-    pq_status: vulnerable
-    rationale: "Seguridad efectiva de ~112 bits ya débil clásicamente; Grover la reduce más."
-    replacement: "AES-256."
-
+    match: ["3DES", "TripleDES", "DES3", "DES-EDE3"]
   - id: RC4
-    category: symmetric
     match: ["RC4", "ARC4"]
-    pq_status: vulnerable
-    rationale: "Cifrador de flujo roto por criptoanálisis clásico conocido."
-    replacement: "ChaCha20-Poly1305 o AES-256-GCM."
+  - id: Blowfish
+    match: ["Blowfish"]
 
   # --- Hash ---
   - id: MD5
-    category: hash
     match: ["\\bMD5\\b", "hashlib\\.md5", "MessageDigest\\.getInstance\\(\"MD5\"\\)"]
-    pq_status: vulnerable
-    rationale: "Roto por colisiones clásicas conocidas; no depende de un adversario cuántico."
-    replacement: "SHA-256 o SHA-3-256."
-
   - id: SHA1
-    category: hash
     match: ["SHA-?1\\b", "hashlib\\.sha1", "MessageDigest\\.getInstance\\(\"SHA-1\"\\)"]
-    pq_status: vulnerable
-    rationale: "Colisiones prácticas demostradas (SHAttered); no depende de un adversario cuántico."
-    replacement: "SHA-256 o SHA-3-256."
-
   - id: SHA-256
-    category: hash
-    match: ["SHA-?256", "hashlib\\.sha256"]
-    pq_status: secure
-    rationale: "Grover reduce la resistencia a preimagen a ~128 bits, considerado suficiente."
-    replacement: null
-
+    match: ["SHA-?256", "hashlib\\.sha256", "SHA-?384", "SHA-?512"]
   - id: SHA-3
-    category: hash
-    match: ["SHA-?3", "hashlib\\.sha3", "Keccak"]
-    pq_status: secure
-    rationale: "Grover reduce la resistencia a preimagen a la mitad; SHA-3-256/512 mantienen margen suficiente."
-    replacement: null
+    match: ["SHA-?3", "hashlib\\.sha3", "Keccak", "SHAKE(128|256)"]
+  - id: BLAKE2
+    match: ["BLAKE2[bs]?", "BLAKE3"]
+
+  # --- KDF / hash de contraseñas ---
+  - id: PBKDF2
+    match: ["PBKDF2"]
+  - id: bcrypt
+    match: ["\\bbcrypt\\b"]
+  - id: Argon2
+    match: ["Argon2(id|i|d)?"]
 
   # --- Protocolo ---
   - id: TLS1.0
-    category: protocol
     match: ["TLSv?1\\.0", "TLS 1\\.0", "SSLv3"]
-    pq_status: vulnerable
-    rationale: "Protocolo obsoleto; además negocia habitualmente suites RSA/ECDHE no post-cuánticas."
-    replacement: "TLS 1.3 con suite híbrida PQC (X25519+ML-KEM) cuando esté disponible."
-
   - id: TLS1.1
-    category: protocol
     match: ["TLSv?1\\.1", "TLS 1\\.1"]
-    pq_status: vulnerable
-    rationale: "Protocolo obsoleto (deprecado por IETF en RFC 8996); negocia habitualmente suites RSA/ECDHE no post-cuánticas."
-    replacement: "TLS 1.3 con suite híbrida PQC (X25519+ML-KEM) cuando esté disponible."
-
   - id: TLS1.2
-    category: protocol
     match: ["TLSv?1\\.2", "TLS 1\\.2"]
-    pq_status: at_risk
-    rationale: "Soporta suites con intercambio de claves RSA/ECDHE clásico; depende de la suite negociada."
-    replacement: "Forzar TLS 1.3 con suite híbrida PQC."
-
   - id: TLS1.3
-    category: protocol
     match: ["TLSv?1\\.3", "TLS 1\\.3"]
-    pq_status: unknown
-    rationale: "TLS 1.3 en sí no es vulnerable, pero el estado post-cuántico depende de si el key-exchange negociado es clásico o híbrido PQC."
-    replacement: "Confirmar que el key-exchange negociado sea híbrido (X25519+ML-KEM) u otro KEM PQC."
+  - id: SSHv1
+    match: ["SSH-1", "SSHv1", "Protocol 1"]
