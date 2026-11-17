@@ -50,6 +50,22 @@ def _asset_type(category: str) -> str:
     return "protocol" if category == "protocol" else "algorithm"
 
 
+# cryptoFunctions de CycloneDX por familia (enum: encrypt/decrypt/sign/verify/
+# digest/keygen/keyderive/tag/encapsulate/decapsulate/other).
+_FUNCTIONS_BY_FAMILY = {
+    "asymmetric": ["keygen"],   # refinado abajo (firma vs confidencialidad)
+    "symmetric": ["encrypt", "decrypt"],
+    "hash": ["digest"],
+    "mac": ["tag"],
+    "kdf": ["keyderive"],
+    "mode": ["encrypt", "decrypt"],
+}
+
+
+def _crypto_functions(category: str) -> list[str]:
+    return _FUNCTIONS_BY_FAMILY.get(category, ["other"])
+
+
 def to_cyclonedx(cbom: dict) -> dict:
     """Convierte un CBOM nativo (dict con 'entries') en un BOM CycloneDX 1.6."""
     now = datetime.now(timezone.utc).isoformat()
@@ -66,17 +82,22 @@ def to_cyclonedx(cbom: dict) -> dict:
 
         crypto_props: dict = {"assetType": _asset_type(category)}
         if category != "protocol":
-            crypto_props["algorithmProperties"] = {
+            algo_props = {
                 "primitive": _primitive_for(category, rule_id),
-                "cryptoFunctions": ["encrypt"] if category == "symmetric" else ["sign", "keygen"],
+                "cryptoFunctions": _crypto_functions(category),
             }
-            level = _NIST_LEVEL_BY_STATUS.get(pq_status)
-            if level is not None:
-                crypto_props["algorithmProperties"]["nistQuantumSecurityLevel"] = level
+            # El nivel de seguridad cuántica NIST solo es significativo para la
+            # criptografía asimétrica (lo que la migración PQC aborda).
+            if category == "asymmetric":
+                level = _NIST_LEVEL_BY_STATUS.get(pq_status)
+                if level is not None:
+                    algo_props["nistQuantumSecurityLevel"] = level
+            crypto_props["algorithmProperties"] = algo_props
 
         component = {
             "type": "cryptographic-asset",
-            "bom-ref": f"{rule_id}:{location}" if location else f"{rule_id}:{i}",
+            # bom-ref ÚNICO (el índice evita duplicados que invalidan el BOM).
+            "bom-ref": f"{rule_id}:{i}:{location}" if location else f"{rule_id}:{i}",
             "name": clf.get("name") or rule_id,
             "cryptoProperties": crypto_props,
             "properties": [

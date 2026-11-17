@@ -1,41 +1,52 @@
-"""Calcula un score de prioridad a partir de pq_status y numero de ocurrencias."""
+"""Prioridad de un hallazgo según su estado, su PRIMITIVA y su recurrencia.
+
+La banda ya no es un alias del estado: una confidencialidad asimétrica rota
+(intercambio de claves, expuesto a HNDL) es crítica; una firma vulnerable es
+alta (riesgo de falsificación futura, no de descifrado retroactivo); un hash o
+cifrador roto clásicamente es alto; lo at_risk es medio; lo unknown, bajo.
+Los plazos se alinean con la transición NIST (2030/2035), no con "90 días".
+"""
 
 from __future__ import annotations
 
 from .schema import Priority
 
-_BASE_SCORE = {
-    "vulnerable": 70,
-    "at_risk": 40,
-    "unknown": 20,
-    "secure": 0,
-}
+_CONFIDENTIALITY = {"encryption", "key-exchange", "kem", "key-transport"}
+_SIGNATURE_IDS = {"ECDSA", "Ed25519", "DSA", "Schnorr", "BLS", "GOST-R-34.10"}
 
+_BAND_SCORE = {"critical": 90, "high": 70, "medium": 45, "low": 20, "none": 0}
 _ACTION = {
-    "vulnerable": "migrar antes de 90 dias",
-    "at_risk": "migrar antes de 180 dias",
-    "unknown": "revision manual para clasificar",
-    "secure": "sin accion requerida",
+    "critical": "migrar con prioridad: dato expuesto a 'harvest now, decrypt later'",
+    "high": "planificar migración a PQC (objetivo NIST: 2030, prohibido 2035)",
+    "medium": "revisar y endurecer (tamaño de clave / suite / versión)",
+    "low": "revisar manualmente para clasificar",
+    "none": "sin acción requerida",
 }
 
 
-def score(pq_status: str, occurrence_count: int) -> Priority:
-    """Devuelve un Priority (score 0-100, banda y accion recomendada) para
-    un hallazgo con el pq_status dado, ajustado por cuantas veces se repite
-    la misma regla."""
-    base = _BASE_SCORE.get(pq_status, 20)
-    bump = min(occurrence_count - 1, 10) * 2 if base > 0 else 0
+def _band(pq_status: str, category: str | None, primitive, rule_id: str | None) -> str:
+    if pq_status == "secure":
+        return "none"
+    if pq_status == "unknown":
+        return "low"
+    if pq_status == "at_risk":
+        return "medium"
+    # vulnerable:
+    prims = {str(p).lower() for p in (primitive or [])}
+    if category == "asymmetric":
+        is_sig = (prims & {"signature"} and not (prims & _CONFIDENTIALITY)) or \
+                 (not prims and rule_id in _SIGNATURE_IDS)
+        if is_sig:
+            return "high"           # falsificación futura
+        return "critical"          # confidencialidad asimétrica = HNDL
+    return "high"                  # simétrico/hash roto clásicamente
+
+
+def score(pq_status: str, occurrence_count: int,
+          category: str | None = None, primitive=None, rule_id: str | None = None) -> Priority:
+    """Devuelve un Priority (score, banda, acción) discriminando por primitiva."""
+    band = _band(pq_status, category, primitive, rule_id)
+    base = _BAND_SCORE[band]
+    bump = min(occurrence_count - 1, 10) if base > 0 else 0
     total = min(base + bump, 100)
-
-    if total >= 70:
-        band = "critical"
-    elif total >= 40:
-        band = "high"
-    elif total >= 20:
-        band = "medium"
-    elif total > 0:
-        band = "low"
-    else:
-        band = "none"
-
-    return Priority(score=total, band=band, recommended_action=_ACTION.get(pq_status, "revision manual"))
+    return Priority(score=total, band=band, recommended_action=_ACTION[band])

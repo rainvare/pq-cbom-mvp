@@ -32,8 +32,19 @@ from pathlib import Path
 
 from .scanner import RawMatch
 
-_PROXY_CA_BUNDLE = Path("/root/.ccr/ca-bundle.crt")
 _USER_AGENT = "pq-cbom-passive/1.0 (+cryptographic-posture-scanner)"
+
+
+def _ca_bundle() -> str | None:
+    """CA bundle a usar: variables de entorno estándar primero, luego el bundle
+    del proxy si existe. No hardcodea rutas de un entorno concreto."""
+    import os
+    for var in ("SSL_CERT_FILE", "REQUESTS_CA_BUNDLE", "PQ_CBOM_CA_BUNDLE"):
+        v = os.environ.get(var)
+        if v and Path(v).exists():
+            return v
+    fallback = Path("/root/.ccr/ca-bundle.crt")  # bundle del proxy de agentes, si aplica
+    return str(fallback) if fallback.exists() else None
 
 
 class PassiveScanError(RuntimeError):
@@ -81,23 +92,27 @@ def _match_text(
 ) -> list[RawMatch]:
     """Produce un RawMatch por cada algorithm_id cuyos patrones aparezcan en
     `text`. `source` identifica de dónde salió la evidencia."""
-    out: list[RawMatch] = []
+    from .scanner import filter_hybrid
+
+    matched: list[str] = []
     for rule_id, patterns in compiled_patterns:
         for pattern in patterns:
             if pattern.search(text):
-                out.append(
-                    RawMatch(rule_id=rule_id, file=source, line=line, snippet=text.strip()[:200])
-                )
+                matched.append(rule_id)
                 break
-    return out
+    return [
+        RawMatch(rule_id=rid, file=source, line=line, snippet=text.strip()[:200])
+        for rid in filter_hybrid(matched)
+    ]
 
 
 def _http_get(url: str, timeout: int = 15) -> bytes:
     """GET vía urllib, respetando el proxy del entorno y su CA bundle."""
     ctx = ssl.create_default_context()
-    if _PROXY_CA_BUNDLE.exists():
+    bundle = _ca_bundle()
+    if bundle:
         try:
-            ctx.load_verify_locations(cafile=str(_PROXY_CA_BUNDLE))
+            ctx.load_verify_locations(cafile=bundle)
         except OSError:
             pass
     req = urllib.request.Request(url, headers={"User-Agent": _USER_AGENT})
@@ -318,6 +333,24 @@ def scan_dns(domain: str) -> PassiveResult:
 # Fuente 4: JWKS / OpenID — cripto de tokens JWT (contacta al objetivo)
 # ----------------------------------------------------------------------------
 
+def _registrable(host: str) -> str:
+    """Aproximación: los dos últimos labels del host (ej. 'accounts.google.com'
+    -> 'google.com'). Suficiente para el guard de mismo-sitio."""
+    parts = host.lower().strip(".").split(".")
+    return ".".join(parts[-2:]) if len(parts) >= 2 else host.lower()
+
+
+def _same_site_https(url: str, domain: str) -> bool:
+    """True si `url` es https y comparte dominio registrable con `domain`."""
+    try:
+        p = urllib.parse.urlparse(url)
+    except ValueError:
+        return False
+    if p.scheme != "https" or not p.hostname:
+        return False
+    return _registrable(p.hostname) == _registrable(domain)
+
+
 def _map_jwt_alg(alg: str) -> str | None:
     a = (alg or "").upper()
     if a.startswith(("RS", "PS")):   # RS256, PS384...
@@ -347,8 +380,13 @@ def scan_jwks(domain: str) -> PassiveResult:
     try:
         raw = _http_get(f"https://{domain}/.well-known/openid-configuration")
         cfg = json.loads(raw)
-        if cfg.get("jwks_uri"):
-            jwks_url = cfg["jwks_uri"]
+        cand = cfg.get("jwks_uri")
+        # Guard SSRF: solo seguir el jwks_uri si es https y del mismo dominio
+        # registrable (evita file://, http:// o redirección a hosts internos).
+        if cand and _same_site_https(cand, domain):
+            jwks_url = cand
+        elif cand:
+            result.notes.append(f"jwks_uri ignorado por seguridad (fuera de dominio/https): {cand}")
         for a in cfg.get("id_token_signing_alg_values_supported", []) or []:
             algs.add(a)
     except Exception:  # noqa: BLE001 — no todos exponen OpenID

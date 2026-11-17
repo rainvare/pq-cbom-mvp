@@ -50,19 +50,23 @@ host:puerto     --[collector de red: sslyze (TLS + cert)]---+--> hallazgos crudo
 `vulnerable` / `at_risk` / `secure` / `unknown` según si lo rompe Shor
 (asimétrico) o si Grover reduce su seguridad efectiva a la mitad
 (simétrico/hash), con la razón y el reemplazo recomendado (algoritmos NIST
-FIPS 203/204/205). No hay heurísticas ni decisiones en tiempo real — es una
-tabla auditable, con tests de regresión (`tests/test_rules_golden.py`) que
-fijan el resultado esperado de cada regla.
+FIPS 203/204/205). La **clasificación** de cada algoritmo es determinista y
+auditable (tabla de conocimiento con tests de regresión en
+`tests/test_rules_golden.py`). La **detección** de dónde se usa cada algoritmo
+es necesariamente heurística (coincidencia de patrones / análisis estático):
+señala evidencia para revisión humana y nunca puede garantizar el 100 %.
 
 **Cada hallazgo del CBOM trae evidencia completa**: ubicación
 (archivo:línea o host:puerto), snippet, regla aplicada, versión del paquete
 de reglas y timestamp — para que la clasificación sea reproducible.
 
-**Qué queda deliberadamente afuera** de este MVP: collectors de cloud o
-binarios, actualización automática de reglas/software, persistencia, API y
-UI. El priority score es una heurística simple (severidad + ocurrencias),
-no el modelo completo de confidencialidad/exposición/vida útil de un
-inventario de activos real.
+**Qué queda deliberadamente afuera**: actualización automática de
+reglas/software, persistencia/base de datos y API. El análisis de binarios y
+Docker (`scan-binary`), el de smart contracts (`scan-contracts`) y la web de
+demo (`docs/`) existen pero son, respectivamente, heurística sobre strings,
+linter por patrón y solo lectura — no sustituyen a herramientas dedicadas.
+La priorización y el índice de riesgo son un modelo explícito y simple, no una
+valoración de activos con contexto de negocio.
 
 ## Cómo levantarla
 

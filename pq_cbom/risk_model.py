@@ -60,6 +60,37 @@ class RiskAssessment:
         return asdict(self)
 
 
+_CONFIDENTIALITY = {"encryption", "key-exchange", "kem", "key-transport"}
+_SIGNATURE = {"signature"}
+# Fallback cuando el CBOM no trae `primitive` (datos antiguos): por rule_id.
+_FALLBACK_SIG_IDS = {"ECDSA", "Ed25519", "DSA", "Schnorr", "BLS", "GOST-R-34.10"}
+
+
+def _primitives(entry) -> set:
+    prims = getattr(entry.classification, "primitive", None) or []
+    return {str(p).lower() for p in prims}
+
+
+def _is_hndl(entry) -> bool:
+    """True si es confidencialidad asimétrica vulnerable (expuesta a HNDL)."""
+    if entry.classification.pq_status != "vulnerable" or entry.classification.category != "asymmetric":
+        return False
+    prims = _primitives(entry)
+    if prims:
+        return bool(prims & _CONFIDENTIALITY)
+    # Sin primitive: todo asimétrico vulnerable que no sea claramente firma.
+    return entry.classification.rule_id not in _FALLBACK_SIG_IDS
+
+
+def _is_signature(entry) -> bool:
+    if entry.classification.category != "asymmetric":
+        return False
+    prims = _primitives(entry)
+    if prims:
+        return bool(prims & _SIGNATURE) and not (prims & _CONFIDENTIALITY)
+    return entry.classification.rule_id in _FALLBACK_SIG_IDS
+
+
 def _risk_band(index: int) -> str:
     if index >= 70:
         return "critical"
@@ -111,12 +142,11 @@ def assess(
     total = len(entries)
     counts = Counter(e.classification.pq_status for e in entries)
 
-    # Exposición HNDL: asimétrico vulnerable (rompible por Shor) = lo que de
-    # verdad urge, porque el dato capturado hoy se descifra post-Q-day.
-    hndl = [
-        e for e in entries
-        if e.classification.pq_status == "vulnerable" and e.classification.category == "asymmetric"
-    ]
+    # Exposición HNDL: SOLO confidencialidad (intercambio de claves / cifrado /
+    # KEM) vulnerable. Las FIRMAS no son HNDL: un dato capturado hoy no se
+    # "descifra" rompiendo una firma a posteriori (el riesgo de firma es la
+    # falsificación futura, que se cuenta aparte).
+    hndl = [e for e in entries if _is_hndl(e)]
     hndl_examples = [
         {
             "rule_id": e.classification.rule_id,
@@ -138,25 +168,38 @@ def assess(
         for e in short[:10]
     ]
 
-    # Índice de riesgo ponderado (presencia + volumen acotado).
-    penalty = 0.0
-    for status, weight in _STATUS_WEIGHT.items():
-        c = counts.get(status, 0)
-        if c and weight:
-            penalty += weight * min(c, _MAX_OCCURRENCES_COUNTED)
-    # Recargo HNDL: lo asimétrico vulnerable pesa extra.
-    penalty += 8 * min(len(hndl), 5)
-    # Recargo por claves cortas: débiles ya hoy, no solo frente a cuántica.
-    penalty += 6 * min(len(short), 5)
-    risk_index = int(min(100, penalty))
+    # Firmas asimétricas vulnerables: riesgo de falsificación futura (no HNDL).
+    vuln_sigs = [e for e in entries if e.classification.pq_status == "vulnerable" and _is_signature(e)]
+    # Rotos clásicamente que no son asimétricos (DES/MD5/RC4/ECB...): deuda hoy.
+    broken_classical = [
+        e for e in entries
+        if e.classification.pq_status == "vulnerable" and e.classification.category not in ("asymmetric",)
+    ]
+    at_risk_n = counts.get("at_risk", 0)
 
-    secure = counts.get("secure", 0)
-    readiness = 100 if total == 0 else round(100 * secure / total)
-
+    # Índice de riesgo DISCRIMINANTE por tipo de exposición (no por nº de líneas).
+    # El intercambio de claves vulnerable (HNDL) domina; una firma o un hash roto
+    # pesan menos; un repo sin exposición asimétrica no puede ser "critical".
+    idx = 0
+    if hndl:
+        idx += 45 + 3 * min(len(hndl), 5)          # exposición HNDL: lo más grave
+    if vuln_sigs:
+        idx += 20 + min(len(vuln_sigs), 5)         # falsificación futura
+    if broken_classical:
+        idx += 12                                   # cripto rota clásicamente
+    if at_risk_n:
+        idx += 6
+    idx += 5 * min(len(short), 4)                   # claves cortas: débiles hoy
     m = mosca(data_shelf_life_years, migration_time_years, years_to_qday)
-    # Si Mosca dice que ya estamos en riesgo, el índice no puede ser bajo.
     if m.at_risk and hndl:
-        risk_index = max(risk_index, 70)
+        idx += 8                                     # Mosca agrava, no fuerza
+    risk_index = int(min(100, idx))
+
+    # Preparación cuántica = sobre la CAPA ASIMÉTRICA (lo que la migración PQC
+    # aborda), no sobre hashes/simétrico que inflan el número.
+    quantum_relevant = [e for e in entries if e.classification.category in ("asymmetric",)]
+    pq_ready = sum(1 for e in quantum_relevant if e.classification.pq_status == "secure")
+    readiness = 100 if not quantum_relevant else round(100 * pq_ready / len(quantum_relevant))
 
     roadmap = _build_roadmap(entries)
 

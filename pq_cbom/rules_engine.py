@@ -33,6 +33,8 @@ class Rule:
     pq_status: str
     rationale: str
     replacement: Optional[str]
+    case_sensitive: bool = False
+    primitive: list = field(default_factory=list)
     # Campos enriquecidos desde la base de conocimiento (pueden ser None):
     name: Optional[str] = None
     quantum_attack: Optional[str] = None
@@ -73,6 +75,8 @@ class RuleSet:
                         pq_status=k.pq_status,
                         rationale=k.rationale,
                         replacement=k.replacement,
+                        case_sensitive=bool(r.get("case_sensitive", False)),
+                        primitive=k.primitive,
                         name=k.name,
                         quantum_attack=k.quantum_attack,
                         classical_bits=k.classical_bits,
@@ -93,6 +97,7 @@ class RuleSet:
                         pq_status=r["pq_status"],
                         rationale=r["rationale"],
                         replacement=r.get("replacement"),
+                        case_sensitive=bool(r.get("case_sensitive", False)),
                     )
                 )
         return cls(version=raw["version"], rules=rules, knowledge_version=kb.version)
@@ -124,12 +129,14 @@ class RuleSet:
             seen_ids.add(r["id"])
 
     def compiled_patterns(self) -> list[tuple[str, list[re.Pattern]]]:
-        """Por cada detector, su id y sus patrones `match` compilados
-        (case-insensitive)."""
-        return [
-            (rule.id, [re.compile(p, re.IGNORECASE) for p in rule.match])
-            for rule in self.rules.values()
-        ]
+        """Por cada detector, su id y sus patrones `match` compilados.
+        Case-insensitive por defecto; case-sensitive si el detector lo pide
+        (acrónimos que coinciden con palabras comunes: DES, RC4, Falcon...)."""
+        out = []
+        for rule in self.rules.values():
+            flags = 0 if rule.case_sensitive else re.IGNORECASE
+            out.append((rule.id, [re.compile(p, flags) for p in rule.match]))
+        return out
 
     def classify(self, rule_id: str) -> Rule:
         """Devuelve la Rule con ese id. Lanza KeyError si no existe."""

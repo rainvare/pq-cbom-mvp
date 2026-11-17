@@ -22,7 +22,11 @@ rules:
   - id: ECDSA
     match: ["ECDSA", "SigningKey\\.generate"]
   - id: ECDH
-    match: ["\\bECDH\\b", "X25519", "X448"]
+    match: ["ECDHE", "\\bECDH\\b", "X25519", "X448"]
+  - id: Hybrid-PQC
+    match: ["(x25519|x448|secp256r1|secp384r1|p-?256|p-?384)[-_]?(ml-?kem|kyber)\\d*",
+            "(ml-?kem|kyber)\\d*[-_]?(x25519|x448|secp256r1|p-?256)",
+            "sntrup761x25519"]
   - id: Ed25519
     match: ["Ed25519", "Ed448"]
   - id: ECC-GENERIC
@@ -32,13 +36,14 @@ rules:
 
   # --- Post-cuántica NIST estandarizada (segura) ---
   - id: ML-KEM
-    match: ["ML-KEM", "Kyber", "CRYSTALS-Kyber"]
+    match: ["ML[_-]?KEM", "MLKEM", "Kyber"]
   - id: ML-DSA
-    match: ["ML-DSA", "Dilithium", "CRYSTALS-Dilithium"]
+    match: ["ML[_-]?DSA", "MLDSA", "Dilithium"]
   - id: SLH-DSA
     match: ["SLH-DSA", "SPHINCS\\+?"]
   - id: FN-DSA
-    match: ["FN-DSA", "\\bFalcon\\b"]
+    case_sensitive: true
+    match: ["FN-DSA", "FALCON", "\\bFalcon\\b"]
 
   # --- Post-cuántica candidatos / en estandarización ---
   - id: HQC
@@ -66,11 +71,13 @@ rules:
   - id: Camellia
     match: ["Camellia"]
   - id: DES
-    match: ["\\bDES\\b(?!\\w)", "DES\\.new"]
+    case_sensitive: true
+    match: ["\\bDES\\b", "DES\\.new", "DESede", "DES-EDE", "DES-CBC"]
   - id: 3DES
     match: ["3DES", "TripleDES", "DES3", "DES-EDE3"]
   - id: RC4
-    match: ["RC4", "ARC4"]
+    case_sensitive: true
+    match: ["\\bRC4\\b", "\\bARC4\\b"]
   - id: Blowfish
     match: ["Blowfish"]
 
@@ -82,7 +89,7 @@ rules:
   - id: SHA-256
     match: ["SHA-?256", "hashlib\\.sha256", "SHA-?384", "SHA-?512"]
   - id: SHA-3
-    match: ["SHA-?3", "hashlib\\.sha3", "Keccak", "SHAKE(128|256)"]
+    match: ["SHA-?3(?![0-9])", "hashlib\\.sha3(?![0-9])", "Keccak", "SHAKE(128|256)"]
   - id: BLAKE2
     match: ["BLAKE2[bs]?", "BLAKE3"]
 
@@ -104,21 +111,20 @@ rules:
   - id: TLS1.3
     match: ["TLSv?1\\.3", "TLS 1\\.3"]
   - id: SSHv1
-    match: ["SSH-1", "SSHv1", "Protocol 1"]
+    match: ["SSH-1\\b", "SSHv1", "SSH protocol 1(?![\\d.])"]
 
   # --- v3: detectores adicionales (bajo riesgo de falso positivo) ---
   # Asimétrica clásica
-  - id: Rabin
-    match: ["\\bRabin\\b"]
   - id: Paillier
     match: ["Paillier"]
   - id: Schnorr
     match: ["Schnorr"]
   - id: BLS
-    match: ["BLS12-381", "\\bBLS\\b"]
+    match: ["BLS12-?381"]
   - id: ECIES
     match: ["ECIES"]
   - id: MQV
+    case_sensitive: true
     match: ["ECMQV", "\\bMQV\\b"]
   - id: SM2
     match: ["\\bSM2\\b"]
@@ -131,11 +137,10 @@ rules:
     match: ["sntrup761", "NTRU.?Prime"]
   - id: XMSS
     match: ["\\bXMSS\\b"]
-  - id: LMS
-    match: ["\\bLMS\\b"]
   - id: SQIsign
     match: ["SQIsign"]
   - id: UOV
+    case_sensitive: true
     match: ["\\bUOV\\b"]
   # Simétrica
   - id: Twofish

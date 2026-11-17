@@ -53,10 +53,19 @@ def _print_summary(entries) -> None:
 
 def _write_cbom(entries, output_path: Path, target: str, rules_name: str, engine: str) -> None:
     """Serializa `entries` como CBOM JSON en `output_path`."""
+    # Versión real del paquete de detectores (no el nombre de archivo): sale de
+    # los propios hallazgos, que graban rule_version.
+    rules_version = rules_name
+    for e in entries:
+        rv = getattr(e.classification, "rule_version", None)
+        if rv:
+            rules_version = rv
+            break
     cbom_json = {
         "cbom_version": "0.1.0-mvp",
         "target": target,
-        "rules_version": rules_name,
+        "rules_version": rules_version,
+        "rules_file": rules_name,
         "engine": engine,
         "entries": [e.to_dict() for e in entries],
     }
@@ -236,6 +245,10 @@ def main(argv: list[str] | None = None) -> int:
     tls_p.add_argument("--port", type=int, default=443, help="Puerto TLS (default 443)")
     tls_p.add_argument("--ip", default=None, help="IP a usar en vez de resolver el hostname por DNS")
     tls_p.add_argument("--rules", type=Path, default=DEFAULT_RULES, help="Paquete de reglas YAML")
+    tls_p.add_argument("--authorize", action="append", default=[], metavar="HOST",
+                       help="Autoriza el escaneo activo de este host (y subdominios). Repetible.")
+    tls_p.add_argument("--scope-file", type=Path, default=None,
+                       help="Archivo con hosts autorizados (uno por línea).")
     tls_p.add_argument("--output", type=Path, default=None, help="Ruta de salida para el CBOM")
     tls_p.add_argument("--quiet", action="store_true", help="No imprimir resumen en consola")
 
@@ -338,6 +351,16 @@ def main(argv: list[str] | None = None) -> int:
         return _ci_gate_entries(entries, args.fail_on)
 
     elif args.command == "scan-tls":
+        from .passive_scanner import in_scope
+        scope = set(args.authorize)
+        if args.scope_file and args.scope_file.is_file():
+            scope.update(ln.strip() for ln in args.scope_file.read_text(encoding="utf-8").splitlines()
+                         if ln.strip() and not ln.strip().startswith("#"))
+        if not in_scope(args.host, scope):
+            print(f"error: scan-tls es ACTIVO y '{args.host}' no está autorizado. "
+                  f"Añade --authorize {args.host} (solo contra activos propios o con permiso).",
+                  file=sys.stderr)
+            return 1
         output_path = args.output or Path(f"cbom_tls_{args.host}_{args.port}.json")
         try:
             entries = build_cbom_tls(args.host, args.rules, port=args.port, ip_address=args.ip)
@@ -353,7 +376,12 @@ def main(argv: list[str] | None = None) -> int:
             print(f"error: '{args.target}' no es un directorio", file=sys.stderr)
             return 1
         output_path = args.output or (args.target / "cbom_keys.json")
-        entries = build_cbom_keys(args.target, args.rules, output_path=output_path)
+        from .keyfile_scanner import KeyScanError
+        try:
+            entries = build_cbom_keys(args.target, args.rules, output_path=output_path)
+        except KeyScanError as e:
+            print(f"error: {e}", file=sys.stderr)
+            return 1
         _write_cbom(entries, output_path, str(args.target), args.rules.name, "keys[cryptography]")
         if not args.quiet:
             _print_summary(entries)

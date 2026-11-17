@@ -45,18 +45,35 @@ def test_assess_empty_is_fully_ready():
     assert a.risk_band == "none"
 
 
-def test_assess_counts_hndl_exposure():
+def _entry_p(pq_status, category, rule_id, primitive):
+    e = _entry(pq_status, category, rule_id)
+    e.classification.primitive = primitive
+    return e
+
+
+def test_hndl_counts_key_exchange_not_signatures():
     entries = [
-        _entry("vulnerable", "asymmetric", "RSA"),
-        _entry("vulnerable", "asymmetric", "ECDSA"),
-        _entry("vulnerable", "symmetric", "DES"),  # vulnerable pero no HNDL (no asimétrico)
-        _entry("secure", "symmetric", "AES-256"),
+        _entry_p("vulnerable", "asymmetric", "RSA", ["encryption", "key-transport"]),  # HNDL
+        _entry_p("vulnerable", "asymmetric", "ECDH", ["key-exchange"]),                 # HNDL
+        _entry_p("vulnerable", "asymmetric", "ECDSA", ["signature"]),                   # NO HNDL (firma)
+        _entry_p("vulnerable", "asymmetric", "Ed25519", ["signature"]),                 # NO HNDL (firma)
+        _entry_p("vulnerable", "symmetric", "DES", []),                                 # NO HNDL (simétrico)
+        _entry_p("secure", "symmetric", "AES-256", []),
     ]
     a = assess(entries)
-    assert a.hndl_exposed == 2
-    assert a.total_assets == 4
-    assert a.quantum_readiness == 25
+    assert a.hndl_exposed == 2            # RSA + ECDH, no las firmas
+    assert a.total_assets == 6
+    # Preparación cuántica sobre la capa asimétrica: 0/4 seguras.
+    assert a.quantum_readiness == 0
     assert a.risk_band in ("high", "critical")
+
+
+def test_signatures_vulnerable_are_not_critical_alone():
+    # Solo firmas vulnerables -> riesgo alto, no critical de HNDL.
+    entries = [_entry_p("vulnerable", "asymmetric", "ECDSA", ["signature"])]
+    a = assess(entries)
+    assert a.hndl_exposed == 0
+    assert a.risk_band in ("medium", "high")  # no critical
 
 
 def test_assess_readiness_all_secure():
