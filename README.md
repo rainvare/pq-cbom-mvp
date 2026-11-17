@@ -84,6 +84,15 @@ python -m pq_cbom.cli scan sample_target --engine semgrep
 Genera `sample_target/cbom.json` e imprime un resumen por consola. Otras
 opciones: `--rules <paquete.yaml>`, `--output <ruta>`, `--quiet`.
 
+**Escanear claves y certificados en disco (tamaño de clave real):**
+
+```bash
+python -m pq_cbom.cli scan-keys ./mi-repo
+```
+
+Parsea certificados y claves PEM/DER/SSH y extrae el tamaño de cada clave,
+marcando las claves cortas (RSA/DSA < 2048, EC < 256).
+
 **Escanear un host (TLS + certificado):**
 
 ```bash
@@ -134,6 +143,10 @@ pública, sin desplegar un escaneo intrusivo:
   (tipo de clave, algoritmo de firma). **No contacta al objetivo.**
 - **TLS + cabeceras HTTP** — una conexión normal (como un navegador) que lee la
   versión y suite TLS negociadas y las cabeceras de seguridad (HSTS…).
+- **DNS (DNSSEC + CAA)** — vía resolver público (DNS-over-HTTPS), sin tocar el
+  objetivo: detecta el algoritmo de firma de la zona DNSSEC y los registros CAA.
+- **JWKS / OpenID** — algoritmos de firma de JWT publicados en
+  `/.well-known/jwks.json` (contacta al objetivo, requiere autorización).
 
 ```bash
 python -m pq_cbom.cli scan-passive ejemplo.com            # CT logs + TLS/cabeceras

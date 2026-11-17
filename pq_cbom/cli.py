@@ -8,7 +8,7 @@ import sys
 from collections import Counter
 from pathlib import Path
 
-from .build import build_cbom, build_cbom_passive, build_cbom_tls
+from .build import build_cbom, build_cbom_keys, build_cbom_passive, build_cbom_tls
 from .knowledge import KnowledgeBase
 from .passive_scanner import PassiveScanError
 from .risk_model import assess as risk_assess
@@ -72,6 +72,12 @@ def _print_passive_context(result) -> None:
         print("  Cabeceras de seguridad:")
         for k, v in result.security_headers.items():
             print(f"    {k}: {v[:80]}")
+    if getattr(result, "jwt_algorithms", None):
+        print(f"  Algoritmos JWT: {', '.join(result.jwt_algorithms)}")
+    if getattr(result, "caa_records", None):
+        print(f"  Registros CAA: {len(result.caa_records)}")
+        for c in result.caa_records[:5]:
+            print(f"    - {c}")
     for note in result.notes:
         print(f"  · {note}")
 
@@ -185,6 +191,12 @@ def main(argv: list[str] | None = None) -> int:
     tls_p.add_argument("--output", type=Path, default=None, help="Ruta de salida para el CBOM")
     tls_p.add_argument("--quiet", action="store_true", help="No imprimir resumen en consola")
 
+    keys_p = sub.add_parser("scan-keys", help="Escanea certificados y claves en disco (tamaño de clave real)")
+    keys_p.add_argument("target", type=Path, help="Directorio a escanear")
+    keys_p.add_argument("--rules", type=Path, default=DEFAULT_RULES, help="Paquete de detectores YAML")
+    keys_p.add_argument("--output", type=Path, default=None, help="Ruta de salida para cbom.json")
+    keys_p.add_argument("--quiet", action="store_true", help="No imprimir resumen en consola")
+
     pasv_p = sub.add_parser(
         "scan-passive",
         help="Descubrimiento PASIVO de superficie cripto (CT logs + TLS/cabeceras)",
@@ -250,6 +262,16 @@ def main(argv: list[str] | None = None) -> int:
             print(f"error: {e}", file=sys.stderr)
             return 1
         _write_cbom(entries, output_path, f"{args.host}:{args.port}", args.rules.name, "tls[sslyze]")
+        if not args.quiet:
+            _print_summary(entries)
+
+    elif args.command == "scan-keys":
+        if not args.target.is_dir():
+            print(f"error: '{args.target}' no es un directorio", file=sys.stderr)
+            return 1
+        output_path = args.output or (args.target / "cbom_keys.json")
+        entries = build_cbom_keys(args.target, args.rules, output_path=output_path)
+        _write_cbom(entries, output_path, str(args.target), args.rules.name, "keys[cryptography]")
         if not args.quiet:
             _print_summary(entries)
 
