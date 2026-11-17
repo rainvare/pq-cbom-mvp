@@ -68,6 +68,8 @@ class PassiveResult:
     tls_cipher: str | None = None
     cert_verified: bool | None = None
     security_headers: dict = field(default_factory=dict)
+    jwt_algorithms: list[str] = field(default_factory=list)
+    caa_records: list[str] = field(default_factory=list)
     notes: list[str] = field(default_factory=list)
 
 
@@ -260,6 +262,125 @@ def scan_tls_headers(
     return result
 
 
+# ----------------------------------------------------------------------------
+# Fuente 3: DNS vía DNS-over-HTTPS — pasivo puro (no contacta al objetivo)
+# ----------------------------------------------------------------------------
+
+# Números de algoritmo DNSSEC (RFC 8624) -> algorithm_id de la base de conocimiento.
+_DNSSEC_ALG = {
+    "1": "RSA", "5": "RSA", "7": "RSA", "8": "RSA", "10": "RSA",
+    "3": "DSA", "6": "DSA",
+    "13": "ECDSA", "14": "ECDSA",
+    "15": "Ed25519", "16": "Ed25519",
+}
+
+
+def scan_dns(domain: str) -> PassiveResult:
+    """Consulta DNSSEC (DNSKEY) y CAA del dominio vía DNS-over-HTTPS (dns.google).
+    Pregunta a un resolver público, no al objetivo: es pasivo puro."""
+    result = PassiveResult()
+
+    # DNSKEY (type 48): algoritmo de firma de la zona DNSSEC.
+    try:
+        raw = _http_get(f"https://dns.google/resolve?name={urllib.parse.quote(domain)}&type=48")
+        data = json.loads(raw)
+        for ans in data.get("Answer", []):
+            parts = str(ans.get("data", "")).split()
+            if len(parts) >= 3:
+                rid = _DNSSEC_ALG.get(parts[2])
+                if rid:
+                    result.matches.append(
+                        RawMatch(rule_id=rid, file=f"dnssec:{domain}", line=0,
+                                 snippet=f"DNSSEC DNSKEY algoritmo {parts[2]}")
+                    )
+        if not result.matches:
+            result.notes.append(f"DNSSEC: sin DNSKEY para {domain} (zona no firmada o sin datos).")
+    except Exception as e:  # noqa: BLE001
+        result.notes.append(f"DNSSEC no consultado: {e}")
+
+    # CAA (type 257): qué CAs pueden emitir certificados (gobernanza cripto).
+    try:
+        raw = _http_get(f"https://dns.google/resolve?name={urllib.parse.quote(domain)}&type=257")
+        data = json.loads(raw)
+        for ans in data.get("Answer", []):
+            d = str(ans.get("data", "")).strip()
+            if d:
+                result.caa_records.append(d)
+        if result.caa_records:
+            result.notes.append(f"CAA: {len(result.caa_records)} registro(s).")
+    except Exception as e:  # noqa: BLE001
+        result.notes.append(f"CAA no consultado: {e}")
+
+    return result
+
+
+# ----------------------------------------------------------------------------
+# Fuente 4: JWKS / OpenID — cripto de tokens JWT (contacta al objetivo)
+# ----------------------------------------------------------------------------
+
+def _map_jwt_alg(alg: str) -> str | None:
+    a = (alg or "").upper()
+    if a.startswith(("RS", "PS")):   # RS256, PS384...
+        return "RSA"
+    if a.startswith("ES"):           # ES256, ES384...
+        return "ECDSA"
+    if a == "EDDSA":
+        return "Ed25519"
+    if a.startswith("HS"):           # HS256...
+        return "HMAC"
+    return None
+
+
+def _map_jwk_kty(kty: str) -> str | None:
+    k = (kty or "").upper()
+    return {"RSA": "RSA", "EC": "ECDSA", "OKP": "Ed25519", "OCT": "HMAC"}.get(k)
+
+
+def scan_jwks(domain: str) -> PassiveResult:
+    """Busca el JWKS del dominio (vía OpenID discovery o /.well-known/jwks.json)
+    y extrae los algoritmos de firma de JWT. Contacta al objetivo."""
+    result = PassiveResult()
+    jwks_url = f"https://{domain}/.well-known/jwks.json"
+    algs: set[str] = set()
+
+    # 1) OpenID discovery para localizar el jwks_uri y los algs soportados.
+    try:
+        raw = _http_get(f"https://{domain}/.well-known/openid-configuration")
+        cfg = json.loads(raw)
+        if cfg.get("jwks_uri"):
+            jwks_url = cfg["jwks_uri"]
+        for a in cfg.get("id_token_signing_alg_values_supported", []) or []:
+            algs.add(a)
+    except Exception:  # noqa: BLE001 — no todos exponen OpenID
+        pass
+
+    # 2) JWKS: claves publicadas.
+    try:
+        raw = _http_get(jwks_url)
+        jwks = json.loads(raw)
+        for key in jwks.get("keys", []):
+            if key.get("alg"):
+                algs.add(key["alg"])
+            rid = _map_jwk_kty(key.get("kty", ""))
+            if rid:
+                result.matches.append(
+                    RawMatch(rule_id=rid, file=f"jwks:{domain}", line=0,
+                             snippet=f"JWKS kty={key.get('kty')} alg={key.get('alg', '?')}")
+                )
+        result.notes.append(f"JWKS: {len(jwks.get('keys', []))} clave(s) en {jwks_url}.")
+    except Exception as e:  # noqa: BLE001
+        result.notes.append(f"JWKS no encontrado para {domain}: {e}")
+
+    for a in sorted(algs):
+        result.jwt_algorithms.append(a)
+        rid = _map_jwt_alg(a)
+        if rid:
+            result.matches.append(
+                RawMatch(rule_id=rid, file=f"jwt:{domain}", line=0, snippet=f"JWT alg={a}")
+            )
+    return result
+
+
 def scan(
     domain: str,
     compiled_patterns: list[tuple[str, list[re.Pattern]]],
@@ -275,9 +396,17 @@ def scan(
     `authorized_scope`. Sin scope autorizado, se omite y se deja constancia:
     es la salvaguarda que impide contactar sistemas de terceros sin permiso."""
     result = scan_ct_logs(domain, compiled_patterns, sample=sample)
+
+    # DNS (DNSSEC + CAA): pasivo puro, no contacta al objetivo. Siempre se ejecuta.
+    dns = scan_dns(domain)
+    result.matches.extend(dns.matches)
+    result.caa_records = dns.caa_records
+    result.notes.extend(dns.notes)
+
+    # Parte que SÍ contacta al objetivo (TLS/cabeceras + JWKS): solo con autorización.
     if include_active and not in_scope(domain, authorized_scope):
         result.notes.append(
-            f"TLS/cabeceras OMITIDO: '{domain}' no está en el scope autorizado. "
+            f"TLS/cabeceras/JWKS OMITIDO: '{domain}' no está en el scope autorizado. "
             f"Autoriza el dominio (--authorize/--scope-file) o usa --ct-only."
         )
         return result
@@ -292,6 +421,11 @@ def scan(
             result.notes.extend(active.notes)
         except PassiveScanError as e:
             result.notes.append(f"TLS/cabeceras omitido: {e}")
+        # JWKS / JWT (endpoint público pero contacta al objetivo).
+        jwks = scan_jwks(domain)
+        result.matches.extend(jwks.matches)
+        result.jwt_algorithms = jwks.jwt_algorithms
+        result.notes.extend(jwks.notes)
     return result
 
 

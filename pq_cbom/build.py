@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections import Counter
 from pathlib import Path
 
-from . import passive_scanner, scanner, semgrep_scanner, tls_scanner
+from . import keyfile_scanner, passive_scanner, scanner, semgrep_scanner, tls_scanner
 from .priority import score as priority_score
 from .rules_engine import RuleSet
 from .scanner import RawMatch
@@ -84,6 +84,19 @@ def build_cbom_tls(
     ruleset = RuleSet.load(rules_path)
     raw_matches = tls_scanner.scan_host(hostname, port=port, ip_address=ip_address)
     return _assemble_entries(raw_matches, ruleset, detected_by="pq-cbom-mvp/tls-scanner[sslyze]")
+
+
+def build_cbom_keys(
+    target: Path,
+    rules_path: Path,
+    output_path: Path | None = None,
+) -> list[CBOMEntry]:
+    """Escanea `target` buscando certificados y claves (material real en disco)
+    y devuelve el CBOM con el tamaño de cada clave."""
+    ruleset = RuleSet.load(rules_path)
+    exclude = {output_path.resolve()} if output_path else set()
+    raw_matches = keyfile_scanner.scan_directory(target, exclude=exclude)
+    return _assemble_entries(raw_matches, ruleset, detected_by="pq-cbom-mvp/key-scanner")
 
 
 def build_cbom_passive(

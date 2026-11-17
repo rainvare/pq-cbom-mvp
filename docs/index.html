@@ -184,19 +184,24 @@
 <section id="evaluar">
   <div class="wrap">
     <p class="eyebrow">Qué se puede evaluar</p>
-    <h2>Tres fuentes, una base de conocimiento</h2>
+    <h2>Cinco collectors, una base de conocimiento</h2>
     <p class="sub">Cómo se invoca cada collector desde el código del repositorio.</p>
 
     <div class="tabs">
       <div class="tab active" data-tab="code">Código</div>
+      <div class="tab" data-tab="keys">Claves / Certs</div>
       <div class="tab" data-tab="tls">Red / TLS</div>
-      <div class="tab" data-tab="passive">Pasivo (CT logs)</div>
+      <div class="tab" data-tab="passive">Pasivo (CT · DNS · JWKS)</div>
       <div class="tab" data-tab="risk">Riesgo + export</div>
     </div>
 
     <div class="tab-body active" data-tab="code">
       <div class="code">python -m pq_cbom.cli scan ./mi-repo --engine semgrep --output cbom.json</div>
       <p class="note">Escanea código fuente en 15+ lenguajes. El motor Semgrep evita falsos positivos de comentarios y strings.</p>
+    </div>
+    <div class="tab-body" data-tab="keys">
+      <div class="code">python -m pq_cbom.cli scan-keys ./mi-repo</div>
+      <p class="note">Parsea certificados y claves reales (PEM/DER/SSH) y extrae el <b>tamaño de clave</b>: distingue RSA-1024 de RSA-4096 y marca las claves cortas. Es la dimensión que una simple búsqueda de texto no ve.</p>
     </div>
     <div class="tab-body" data-tab="tls">
       <div class="code">python -m pq_cbom.cli scan-tls ejemplo.com --port 443</div>
@@ -205,10 +210,11 @@
     <div class="tab-body" data-tab="passive">
       <div class="code">python -m pq_cbom.cli scan-passive ejemplo.com --ct-only
 python -m pq_cbom.cli scan-passive ejemplo.com --authorize ejemplo.com</div>
+      <p class="note">CT logs (certificados), <b>DNSSEC</b> (algoritmo de firma de la zona) y <b>CAA</b> salen vía resolver público, sin tocar el objetivo. TLS/cabeceras y <b>JWKS</b> (algoritmos de firma de JWT) sí lo contactan.</p>
       <p class="warn-note">
-        CT logs no contacta al objetivo (siempre seguro). La parte activa (TLS/cabeceras)
-        solo corre contra dominios autorizados explícitamente: esta herramienta evalúa
-        <b>tu propia</b> postura cripto o la de un cliente con permiso, no sistemas de terceros.
+        La parte que contacta al objetivo (TLS/cabeceras/JWKS) solo corre contra dominios
+        autorizados explícitamente: esta herramienta evalúa <b>tu propia</b> postura cripto
+        o la de un cliente con permiso, no sistemas de terceros.
       </p>
     </div>
     <div class="tab-body" data-tab="risk">
