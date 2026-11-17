@@ -1,3 +1,33 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pq-cbom"
+version = "0.5.0"
+description = "Inventario y evaluación de riesgo criptográfico frente a la amenaza cuántica (CBOM post-cuántico)."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { file = "LICENSE" }
+dependencies = ["pyyaml>=6.0"]
+
+[project.optional-dependencies]
+tls = ["sslyze>=6.0", "cryptography>=42"]
+keys = ["cryptography>=42"]
+semgrep = ["semgrep>=1.170"]
+contracts = ["slither-analyzer>=0.10"]
+dev = ["pytest>=7.0", "cryptography>=42"]
+
+[project.scripts]
+pq-cbom = "pq_cbom.cli:main"
+
+[tool.setuptools]
+# El paquete y sus datos (reglas + base de conocimiento) viven en el repo.
+packages = ["pq_cbom"]
+
+[tool.setuptools.package-data]
+pq_cbom = []
+
 [tool.pytest.ini_options]
 pythonpath = ["."]
 testpaths = ["tests"]

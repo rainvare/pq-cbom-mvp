@@ -16,8 +16,17 @@ import urllib.request
 from dataclasses import dataclass, field
 from pathlib import Path
 
-_PROXY_CA_BUNDLE = Path("/root/.ccr/ca-bundle.crt")
 _UA = "pq-cbom-osv/1.0"
+
+
+def _ca_bundle() -> str | None:
+    import os
+    for var in ("SSL_CERT_FILE", "REQUESTS_CA_BUNDLE", "PQ_CBOM_CA_BUNDLE"):
+        v = os.environ.get(var)
+        if v and Path(v).exists():
+            return v
+    fallback = Path("/root/.ccr/ca-bundle.crt")
+    return str(fallback) if fallback.exists() else None
 
 
 class OsvError(RuntimeError):
@@ -47,9 +56,10 @@ class OsvResult:
 
 def _ctx() -> ssl.SSLContext:
     ctx = ssl.create_default_context()
-    if _PROXY_CA_BUNDLE.exists():
+    bundle = _ca_bundle()
+    if bundle:
         try:
-            ctx.load_verify_locations(cafile=str(_PROXY_CA_BUNDLE))
+            ctx.load_verify_locations(cafile=bundle)
         except OSError:
             pass
     return ctx

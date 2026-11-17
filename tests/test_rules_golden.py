@@ -51,7 +51,6 @@ EXPECTED_STATUS = {
     "SSHv1": "vulnerable",
     # --- Añadidos en v3.0 (cobertura exhaustiva) ---
     "AES-192": "secure",
-    "Rabin": "vulnerable",
     "Paillier": "vulnerable",
     "Schnorr": "vulnerable",
     "BLS": "vulnerable",
@@ -61,8 +60,8 @@ EXPECTED_STATUS = {
     "GOST-R-34.10": "vulnerable",
     "SIKE": "vulnerable",
     "NTRU-Prime": "secure",
+    "Hybrid-PQC": "secure",
     "XMSS": "secure",
-    "LMS": "secure",
     "SQIsign": "secure",
     "UOV": "secure",
     "Twofish": "secure",

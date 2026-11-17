@@ -25,6 +25,19 @@ class RawMatch:
     snippet: str
 
 
+# Componentes clásicos que un híbrido post-cuántico "absorbe": si en el mismo
+# texto se detecta un híbrido (p.ej. X25519MLKEM768), no debe contarse además
+# como ECDH vulnerable ni como ML-KEM suelto.
+_HYBRID_ABSORBS = {"ECDH", "ML-KEM", "ML-DSA", "ECDSA", "X448"}
+
+
+def filter_hybrid(rule_ids: list[str]) -> list[str]:
+    """Si hay un híbrido PQC en la lista, elimina sus componentes clásicos."""
+    if "Hybrid-PQC" in rule_ids:
+        return [r for r in rule_ids if r not in _HYBRID_ABSORBS]
+    return rule_ids
+
+
 def _looks_like_generated_cbom(path: Path) -> bool:
     """Devuelve True si `path` es un JSON cuyo contenido empieza con la
     clave "cbom_version" (un CBOM generado por este mismo programa)."""
@@ -45,7 +58,11 @@ def iter_source_files(target: Path, exclude: set[Path] | None = None) -> Iterabl
     for path in target.rglob("*"):
         if not path.is_file():
             continue
-        if any(part in SKIP_DIRS for part in path.parts):
+        try:
+            rel_parts = path.relative_to(target).parts
+        except ValueError:
+            rel_parts = path.parts
+        if any(part in SKIP_DIRS for part in rel_parts):
             continue
         if path.resolve() in exclude:
             continue
@@ -71,18 +88,16 @@ def scan_directory(
             continue
         lines = text.splitlines()
         for lineno, line in enumerate(lines, start=1):
+            matched: list[str] = []
             for rule_id, patterns in compiled_rules:
                 for pattern in patterns:
                     if pattern.search(line):
-                        matches.append(
-                            RawMatch(
-                                rule_id=rule_id,
-                                file=str(path),
-                                line=lineno,
-                                snippet=line.strip()[:200],
-                            )
-                        )
+                        matched.append(rule_id)
                         break
+            for rule_id in filter_hybrid(matched):
+                matches.append(
+                    RawMatch(rule_id=rule_id, file=str(path), line=lineno, snippet=line.strip()[:200])
+                )
     return matches
 
 

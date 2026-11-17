@@ -29,6 +29,7 @@ class Classification:
     rule_version: str
     rationale: str
     replacement: Optional[str]
+    primitive: list = None  # encryption | key-exchange | kem | signature | hashing...
 
 
 @dataclass

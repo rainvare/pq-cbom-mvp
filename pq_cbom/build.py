@@ -48,8 +48,12 @@ def _assemble_entries(raw_matches: list[RawMatch], ruleset: RuleSet, detected_by
             rule_version=ruleset.version,
             rationale=rule.rationale,
             replacement=rule.replacement,
+            primitive=list(rule.primitive or []),
         )
-        priority = priority_score(rule.pq_status, occurrence_counts[m.rule_id])
+        priority = priority_score(
+            rule.pq_status, occurrence_counts[m.rule_id],
+            category=rule.category, primitive=rule.primitive, rule_id=rule.id,
+        )
         entries.append(CBOMEntry(finding=finding, classification=classification, priority=priority))
 
     entries.sort(key=lambda e: e.priority.score, reverse=True)

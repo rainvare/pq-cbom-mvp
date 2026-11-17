@@ -24,6 +24,20 @@ from typing import Iterable
 from .scanner import RawMatch
 from .tls_scanner import _classify_public_key, _describe_key
 
+
+class KeyScanError(RuntimeError):
+    """No se pudo escanear material de claves (p.ej. falta 'cryptography')."""
+
+
+def _require_cryptography() -> None:
+    try:
+        import cryptography  # noqa: F401
+    except ImportError as e:
+        raise KeyScanError(
+            "El paquete 'cryptography' no está instalado; scan-keys no puede parsear "
+            "claves/certificados. Instalar con: pip install cryptography"
+        ) from e
+
 KEY_EXTENSIONS = {
     ".pem", ".crt", ".cer", ".der", ".key", ".pub", ".p7b", ".p7c",
     ".p12", ".pfx", ".jks", ".keystore", ".asc", ".gpg", ".ssh",
@@ -71,7 +85,13 @@ def iter_key_files(target: Path, exclude: set[Path] | None = None) -> Iterable[P
     for path in target.rglob("*"):
         if not path.is_file():
             continue
-        if any(part in SKIP_DIRS for part in path.parts):
+        # SKIP_DIRS relativo al objetivo: no saltar si el OBJETIVO ya vive bajo
+        # 'build'/'lib'/'dist' (eso omitía todo el escaneo).
+        try:
+            rel_parts = path.relative_to(target).parts
+        except ValueError:
+            rel_parts = path.parts
+        if any(part in SKIP_DIRS for part in rel_parts):
             continue
         if path.resolve() in exclude:
             continue
@@ -156,6 +176,7 @@ def _analyze_ssh_line(line: str):
 def scan_directory(target: Path, exclude: set[Path] | None = None) -> list[RawMatch]:
     """Escanea `target` buscando certificados y claves; devuelve un RawMatch por
     cada pieza de material criptográfico identificada, con su tamaño."""
+    _require_cryptography()
     matches: list[RawMatch] = []
     for path in iter_key_files(target, exclude):
         try:

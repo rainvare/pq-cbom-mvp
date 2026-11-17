@@ -205,10 +205,13 @@ def scan_directory(target: Path, exclude: set[Path] | None = None) -> DepsResult
         manifests += 1
         for pkg in _extract_packages(path):
             low = pkg.lower()
+            # Tokens exactos (evita que 'ring' marque 'spring-boot').
+            tokens = set(re.split(r"[-_/.@]", low)) | {low, low.split("/")[-1]}
+            tokens.discard("")
 
             # ¿implica un algoritmo concreto?
             for needle, rule_id in ALGO_PACKAGES:
-                if needle in low:
+                if needle in tokens:
                     result.matches.append(
                         RawMatch(rule_id=rule_id, file=str(path), line=0,
                                  snippet=f"dependencia '{pkg}' -> {rule_id}")
@@ -217,13 +220,13 @@ def scan_directory(target: Path, exclude: set[Path] | None = None) -> DepsResult
 
             # ¿es una librería cripto general?
             base = low.split("/")[-1]
-            if any(lib in low for lib in CRYPTO_LIBS) and base not in seen_lib:
+            if (tokens & CRYPTO_LIBS) and base not in seen_lib:
                 seen_lib.add(base)
                 result.crypto_libs.append(f"{pkg} ({path.name})")
 
             # ¿abandonada / débil?
             for weak, reason in WEAK_LIBS.items():
-                if weak in low:
+                if weak in tokens:
                     entry = f"{pkg}: {reason}"
                     if entry not in result.weak_libs:
                         result.weak_libs.append(entry)

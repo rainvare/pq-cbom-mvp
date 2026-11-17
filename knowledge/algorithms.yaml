@@ -240,13 +240,32 @@ algorithms:
     classical_bits: 128
     quantum_bits: 128
     pq_status: secure
-    nist_status: standardized      # seleccionado; borrador FIPS 206 en progreso
-    standard: "FIPS 206 (en borrador)"
+    nist_status: selected        # seleccionado por NIST; FIPS 206 AÚN en borrador (no finalizado)
+    standard: "FIPS 206 (borrador; finalización esperada 2026-2027)"
     deprecate_by: null
+    basis: "nist:candidate"
     replacement: null
-    rationale: "Firma compacta basada en retículos NTRU; seleccionada por NIST para estandarización."
+    rationale: "Firma compacta basada en retículos NTRU; seleccionada por NIST, pero FIPS 206 todavía no está finalizado."
     references: ["NIST PQC — FALCON", "FIPS 206 (draft)"]
     aliases: ["fn-dsa", "falcon"]
+
+  - id: Hybrid-PQC
+    name: "Híbrido PQC (clásico + post-cuántico)"
+    family: asymmetric
+    primitive: [key-exchange, kem]
+    math_problem: hybrid
+    quantum_attack: none
+    classical_bits: 192
+    quantum_bits: 192
+    pq_status: secure
+    nist_status: standardized
+    standard: "draft-ietf-tls-hybrid-design / X25519MLKEM768"
+    deprecate_by: null
+    basis: "nist:standardized"
+    replacement: null
+    rationale: "Combina un KEM clásico y uno post-cuántico (p.ej. X25519+ML-KEM): seguro mientras cualquiera de los dos resista. Es la práctica recomendada en la transición."
+    references: ["draft-ietf-tls-hybrid-design", "FIPS 203"]
+    aliases: ["x25519mlkem768", "x25519kyber768", "secp256r1mlkem768", "mlkem768x25519", "hybrid", "pq-hybrid"]
 
   # ======================================================================
   # POST-CUÁNTICA — candidatos / en estandarización (seguros pero no finales)
@@ -312,10 +331,10 @@ algorithms:
     quantum_bits: 128
     pq_status: secure
     nist_status: candidate
-    standard: "Finalista NIST PQC (no estandarizado; base de FALCON)"
+    standard: "Finalista NIST PQC (NO seleccionado)"
     deprecate_by: null
     replacement: null
-    rationale: "KEM basado en retículos NTRU; sin ataque cuántico conocido."
+    rationale: "KEM basado en retículos NTRU; finalista no seleccionado por NIST, sin ataque conocido."
     references: ["NIST PQC round 3"]
     aliases: ["ntru"]
 
@@ -936,7 +955,7 @@ algorithms:
     quantum_attack: none
     pq_status: secure
     nist_status: candidate
-    standard: "Finalista NIST PQC (no seleccionado)"
+    standard: "Finalista NIST PQC (NO seleccionado)"
     basis: "nist:candidate"
     replacement: null
     rationale: "KEM basado en Module-LWR; finalista, sin ataque conocido."
