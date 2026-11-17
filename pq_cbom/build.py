@@ -5,7 +5,15 @@ from __future__ import annotations
 from collections import Counter
 from pathlib import Path
 
-from . import keyfile_scanner, manifest_scanner, passive_scanner, scanner, semgrep_scanner, tls_scanner
+from . import (
+    binary_scanner,
+    keyfile_scanner,
+    manifest_scanner,
+    passive_scanner,
+    scanner,
+    semgrep_scanner,
+    tls_scanner,
+)
 from .priority import score as priority_score
 from .rules_engine import RuleSet
 from .scanner import RawMatch
@@ -110,6 +118,20 @@ def build_cbom_deps(
     exclude = {output_path.resolve()} if output_path else set()
     result = manifest_scanner.scan_directory(target, exclude=exclude)
     entries = _assemble_entries(result.matches, ruleset, detected_by="pq-cbom-mvp/deps-scanner")
+    return entries, result
+
+
+def build_cbom_binary(
+    target: Path,
+    rules_path: Path,
+    output_path: Path | None = None,
+) -> tuple[list[CBOMEntry], "binary_scanner.BinaryResult"]:
+    """Escanea binarios y Dockerfiles bajo `target`: algoritmos y librerías
+    cripto enlazadas/instaladas."""
+    ruleset = RuleSet.load(rules_path)
+    exclude = {output_path.resolve()} if output_path else set()
+    result = binary_scanner.scan_directory(target, ruleset.compiled_patterns(), exclude=exclude)
+    entries = _assemble_entries(result.matches, ruleset, detected_by="pq-cbom-mvp/binary-scanner")
     return entries, result
 
 

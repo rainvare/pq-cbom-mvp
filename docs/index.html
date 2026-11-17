@@ -184,13 +184,14 @@
 <section id="evaluar">
   <div class="wrap">
     <p class="eyebrow">Qué se puede evaluar</p>
-    <h2>Seis collectors, un analizador de contratos y modo CI</h2>
+    <h2>Siete collectors, analizador de contratos y modo CI</h2>
     <p class="sub">Cómo se invoca cada collector desde el código del repositorio.</p>
 
     <div class="tabs">
       <div class="tab active" data-tab="code">Código</div>
       <div class="tab" data-tab="keys">Claves / Certs</div>
-      <div class="tab" data-tab="deps">Dependencias</div>
+      <div class="tab" data-tab="deps">Dependencias · OSV</div>
+      <div class="tab" data-tab="binary">Binarios · Docker</div>
       <div class="tab" data-tab="tls">Red / TLS</div>
       <div class="tab" data-tab="passive">Pasivo (CT · DNS · JWKS)</div>
       <div class="tab" data-tab="contracts">Smart contracts</div>
@@ -206,12 +207,17 @@
       <p class="note">Parsea certificados y claves reales (PEM/DER/SSH) y extrae el <b>tamaño de clave</b>: distingue RSA-1024 de RSA-4096 y marca las claves cortas. Es la dimensión que una simple búsqueda de texto no ve.</p>
     </div>
     <div class="tab-body" data-tab="deps">
-      <div class="code">python -m pq_cbom.cli scan-deps ./mi-repo</div>
-      <p class="note">Lee manifiestos (package.json, requirements.txt, go.mod, pom.xml, Cargo.toml…) y encuentra la cripto que entra por librería aunque no aparezca ningún algoritmo en el código. Marca librerías abandonadas o con CVE conocida (pycrypto, elliptic&lt;6.5.4, node-forge&lt;1.0…).</p>
+      <div class="code">python -m pq_cbom.cli scan-deps ./mi-repo --osv --fail-on-cve</div>
+      <p class="note">Lee manifiestos (package.json, requirements.txt, go.mod, pom.xml, Cargo.toml…) y encuentra la cripto que entra por librería. Con <code>--osv</code> consulta <b>OSV.dev</b> por las CVE reales de cada dependencia con versión (CVE/GHSA con severidad), y <code>--fail-on-cve</code> rompe el build si hay alguna.</p>
+    </div>
+    <div class="tab-body" data-tab="binary">
+      <div class="code">python -m pq_cbom.cli scan-binary ./build</div>
+      <p class="note">Extrae strings de binarios compilados (ELF/PE/Mach-O/.so/.wasm) y detecta la versión de la librería cripto enlazada (OpenSSL, BoringSSL, libgcrypt, mbedTLS, wolfSSL…) y los algoritmos presentes. Analiza también Dockerfiles (imagen base y paquetes cripto instalados). Heurística sobre strings, no desensamblado.</p>
     </div>
     <div class="tab-body" data-tab="contracts">
-      <div class="code">python -m pq_cbom.cli scan-contracts ./contracts --fail-on high</div>
-      <p class="note">Analizador de vulnerabilidades de smart contracts (Solidity) alineado con el SWC Registry: reentrancy, tx.origin, delegatecall, selfdestruct, aleatoriedad débil, overflow (&lt;0.8), y el puente cripto <code>ecrecover</code> → ECDSA secp256k1 (vulnerable a Shor). Heurística estática para revisión humana.</p>
+      <div class="code">python -m pq_cbom.cli scan-contracts ./contracts --fail-on high
+python -m pq_cbom.cli scan-contracts ./contracts --engine slither</div>
+      <p class="note">Analizador de vulnerabilidades de smart contracts (Solidity) alineado con el SWC Registry: reentrancy, tx.origin, delegatecall, selfdestruct, aleatoriedad débil, overflow (&lt;0.8), y el puente cripto <code>ecrecover</code> → ECDSA secp256k1 (vulnerable a Shor). El motor <code>regex</code> no tiene dependencias; <code>--engine slither</code> usa el AST real (requiere slither+solc).</p>
     </div>
     <div class="tab-body" data-tab="tls">
       <div class="code">python -m pq_cbom.cli scan-tls ejemplo.com --port 443</div>

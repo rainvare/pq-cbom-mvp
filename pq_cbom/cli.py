@@ -10,6 +10,7 @@ from pathlib import Path
 
 from .build import (
     build_cbom,
+    build_cbom_binary,
     build_cbom_deps,
     build_cbom_keys,
     build_cbom_passive,
@@ -238,6 +239,14 @@ def main(argv: list[str] | None = None) -> int:
     tls_p.add_argument("--output", type=Path, default=None, help="Ruta de salida para el CBOM")
     tls_p.add_argument("--quiet", action="store_true", help="No imprimir resumen en consola")
 
+    bin_p = sub.add_parser("scan-binary", help="Escanea binarios compilados y Dockerfiles (librerías cripto enlazadas)")
+    bin_p.add_argument("target", type=Path, help="Directorio a escanear")
+    bin_p.add_argument("--rules", type=Path, default=DEFAULT_RULES, help="Paquete de detectores YAML")
+    bin_p.add_argument("--output", type=Path, default=None, help="Ruta de salida para cbom.json")
+    bin_p.add_argument("--fail-on", choices=["vulnerable", "at_risk", "unknown"], default=None,
+                       help="Modo CI: salir con código 1 si hay hallazgos de este nivel o peor.")
+    bin_p.add_argument("--quiet", action="store_true", help="No imprimir resumen en consola")
+
     keys_p = sub.add_parser("scan-keys", help="Escanea certificados y claves en disco (tamaño de clave real)")
     keys_p.add_argument("target", type=Path, help="Directorio a escanear")
     keys_p.add_argument("--rules", type=Path, default=DEFAULT_RULES, help="Paquete de detectores YAML")
@@ -250,8 +259,12 @@ def main(argv: list[str] | None = None) -> int:
     deps_p.add_argument("target", type=Path, help="Directorio a escanear")
     deps_p.add_argument("--rules", type=Path, default=DEFAULT_RULES, help="Paquete de detectores YAML")
     deps_p.add_argument("--output", type=Path, default=None, help="Ruta de salida para cbom.json")
+    deps_p.add_argument("--osv", action="store_true",
+                        help="Consultar OSV.dev por CVEs reales de cada dependencia con versión (red).")
     deps_p.add_argument("--fail-on", choices=["vulnerable", "at_risk", "unknown"], default=None,
                         help="Modo CI: salir con código 1 si hay hallazgos de este nivel o peor.")
+    deps_p.add_argument("--fail-on-cve", action="store_true",
+                        help="Modo CI: salir con código 1 si OSV encuentra alguna vulnerabilidad.")
     deps_p.add_argument("--quiet", action="store_true", help="No imprimir resumen en consola")
 
     pasv_p = sub.add_parser(
@@ -288,7 +301,9 @@ def main(argv: list[str] | None = None) -> int:
 
     sc_p = sub.add_parser("scan-contracts", help="Analiza vulnerabilidades de smart contracts (Solidity)")
     sc_p.add_argument("target", type=Path, help="Directorio con archivos .sol")
-    sc_p.add_argument("--rules", type=Path, default=DEFAULT_CONTRACT_RULES, help="Reglas de contratos YAML")
+    sc_p.add_argument("--engine", choices=["regex", "slither"], default="regex",
+                      help="regex: heurística sin dependencias. slither: AST real (requiere slither+solc).")
+    sc_p.add_argument("--rules", type=Path, default=DEFAULT_CONTRACT_RULES, help="Reglas de contratos YAML (motor regex)")
     sc_p.add_argument("--output", type=Path, default=None, help="Ruta de salida del informe JSON")
     sc_p.add_argument("--fail-on", choices=["critical", "high", "medium", "low", "info"], default=None,
                       help="Modo CI: salir con código 1 si hay hallazgos de esta gravedad o peor.")
@@ -344,6 +359,23 @@ def main(argv: list[str] | None = None) -> int:
             _print_summary(entries)
         return _ci_gate_entries(entries, args.fail_on)
 
+    elif args.command == "scan-binary":
+        if not args.target.is_dir():
+            print(f"error: '{args.target}' no es un directorio", file=sys.stderr)
+            return 1
+        output_path = args.output or (args.target / "cbom_binary.json")
+        entries, binres = build_cbom_binary(args.target, args.rules, output_path=output_path)
+        _write_cbom(entries, output_path, str(args.target), args.rules.name, "binary[strings]")
+        if not args.quiet:
+            if binres.libraries:
+                print("\n=== Librerías cripto enlazadas / imágenes ===")
+                for lib in binres.libraries[:25]:
+                    print(f"  · {lib}")
+            for note in binres.notes:
+                print(f"  {note}")
+            _print_summary(entries)
+        return _ci_gate_entries(entries, args.fail_on)
+
     elif args.command == "scan-deps":
         if not args.target.is_dir():
             print(f"error: '{args.target}' no es un directorio", file=sys.stderr)
@@ -362,8 +394,34 @@ def main(argv: list[str] | None = None) -> int:
                     print(f"  ⚠ {w}")
             for note in deps.notes:
                 print(f"  {note}")
+
+        osv_hit = False
+        if args.osv:
+            from . import manifest_scanner as _ms
+            from .osv import OsvError, query_specs
+            specs = _ms.extract_package_specs(args.target)
+            try:
+                osv_res = query_specs(specs)
+                osv_hit = bool(osv_res.vulns)
+                if not args.quiet:
+                    print("\n=== OSV.dev — vulnerabilidades conocidas ===")
+                    for v in osv_res.vulns[:30]:
+                        sev = f" [{v.severity}]" if v.severity else ""
+                        print(f"  ⚠ {v.package}@{v.version} ({v.ecosystem}) → {v.vuln_id}{sev}")
+                        if v.summary:
+                            print(f"      {v.summary}")
+                    for note in osv_res.notes:
+                        print(f"  {note}")
+            except OsvError as e:
+                print(f"  OSV no consultado: {e}", file=sys.stderr)
+
+        if not args.quiet:
             _print_summary(entries)
-        return _ci_gate_entries(entries, args.fail_on)
+        rc = _ci_gate_entries(entries, args.fail_on)
+        if args.fail_on_cve and osv_hit:
+            print("\n[CI] FALLO: OSV encontró vulnerabilidades en dependencias.", file=sys.stderr)
+            rc = rc or 1
+        return rc
 
     elif args.command == "scan-passive":
         output_path = args.output or Path(f"cbom_passive_{args.domain}.json")
@@ -417,9 +475,18 @@ def main(argv: list[str] | None = None) -> int:
             print(f"error: '{args.target}' no es un directorio", file=sys.stderr)
             return 1
         from .contract_scanner import ContractRuleSet, report as contract_report, scan_directory as scan_contracts
-        ruleset = ContractRuleSet.load(args.rules)
-        findings = scan_contracts(args.target, ruleset)
-        rep = contract_report(findings, str(args.target), ruleset.version)
+        if args.engine == "slither":
+            from .contract_slither import SlitherNotAvailable, scan_directory as scan_slither
+            try:
+                findings = scan_slither(args.target)
+            except SlitherNotAvailable as e:
+                print(f"error: {e}", file=sys.stderr)
+                return 1
+            rep = contract_report(findings, str(args.target), "slither")
+        else:
+            ruleset = ContractRuleSet.load(args.rules)
+            findings = scan_contracts(args.target, ruleset)
+            rep = contract_report(findings, str(args.target), ruleset.version)
         output_path = args.output or (args.target / "contract_report.json")
         output_path.write_text(json.dumps(rep, indent=2, ensure_ascii=False), encoding="utf-8")
         print(f"Informe de contratos escrito en: {output_path}")

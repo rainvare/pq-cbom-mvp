@@ -64,6 +64,19 @@ WEAK_LIBS = {
 }
 
 
+# Manifiesto -> ecosistema OSV (https://ossf.github.io/osv-schema/#affectedpackage-field).
+ECOSYSTEM_BY_MANIFEST = {
+    "package.json": "npm",
+    "requirements.txt": "PyPI",
+    "pipfile": "PyPI",
+    "pyproject.toml": "PyPI",
+    "go.mod": "Go",
+    "pom.xml": "Maven",
+    "cargo.toml": "crates.io",
+    "gemfile": "RubyGems",
+}
+
+
 @dataclass
 class DepsResult:
     matches: list[RawMatch] = field(default_factory=list)
@@ -123,6 +136,63 @@ def _extract_packages(path: Path) -> list[str]:
     elif name == "gemfile" or name == "build.gradle":
         pkgs.extend(re.findall(r"""['"]([A-Za-z0-9_.\-]+)['"]""", text))
     return [p for p in pkgs if p]
+
+
+def _clean_version(v: str) -> str:
+    """Normaliza un spec de versión a algo que OSV pueda consultar."""
+    v = v.strip().strip('"\'').lstrip("^~>=< v")
+    # Quedarse con el primer token tipo X.Y.Z.
+    m = re.match(r"[0-9][0-9A-Za-z.\-]*", v)
+    return m.group(0) if m else ""
+
+
+def extract_package_specs(target: Path, exclude: set[Path] | None = None) -> list[dict]:
+    """Devuelve specs {name, version, ecosystem, file} para consulta OSV."""
+    specs: list[dict] = []
+    seen: set[tuple[str, str, str]] = set()
+    for path in iter_manifests(target, exclude):
+        name_l = path.name.lower()
+        eco = ECOSYSTEM_BY_MANIFEST.get(name_l)
+        if not eco:
+            continue
+        try:
+            text = path.read_text(encoding="utf-8", errors="ignore")
+        except OSError:
+            continue
+
+        pairs: list[tuple[str, str]] = []
+        if name_l == "package.json":
+            try:
+                data = json.loads(text)
+                for key in ("dependencies", "devDependencies"):
+                    for n, v in (data.get(key) or {}).items():
+                        pairs.append((n, _clean_version(str(v))))
+            except json.JSONDecodeError:
+                pass
+        elif name_l in ("requirements.txt", "pipfile", "pyproject.toml"):
+            for line in text.splitlines():
+                m = re.match(r'\s*["\']?([A-Za-z0-9_.\-]+)["\']?\s*[=~<>!]+\s*["\']?v?([0-9][0-9A-Za-z.\-]*)', line)
+                if m:
+                    pairs.append((m.group(1), m.group(2)))
+        elif name_l == "go.mod":
+            for m in re.finditer(r"^\s*([a-z0-9./\-]+)\s+v([0-9][0-9A-Za-z.\-]*)", text, re.MULTILINE):
+                pairs.append((m.group(1), m.group(2)))
+        elif name_l == "cargo.toml":
+            for m in re.finditer(r'^\s*([A-Za-z0-9_\-]+)\s*=\s*["\']([0-9][0-9A-Za-z.\-]*)["\']', text, re.MULTILINE):
+                pairs.append((m.group(1), m.group(2)))
+        elif name_l == "gemfile":
+            for m in re.finditer(r"""gem\s+['"]([A-Za-z0-9_.\-]+)['"]\s*,\s*['"][~>=< ]*([0-9][0-9A-Za-z.\-]*)""", text):
+                pairs.append((m.group(1), m.group(2)))
+
+        for n, v in pairs:
+            if not n or not v:
+                continue
+            key = (eco, n.lower(), v)
+            if key in seen:
+                continue
+            seen.add(key)
+            specs.append({"name": n, "version": v, "ecosystem": eco, "file": path.name})
+    return specs
 
 
 def scan_directory(target: Path, exclude: set[Path] | None = None) -> DepsResult:

@@ -254,3 +254,42 @@ falsos positivos), no análisis simbólico.
 ```bash
 python -m pq_cbom.cli scan-contracts ./contracts --fail-on high
 ```
+
+---
+
+## v5 — Slither, OSV.dev y binarios/Docker
+
+### Motor Slither para contratos (`scan-contracts --engine slither`)
+
+Igual que `--engine semgrep` para código: `--engine slither` usa el AST real de
+Solidity (compila con solc) en vez de regex, eliminando falsos positivos.
+Requiere `slither-analyzer` y `solc`; si no están, el CLI lo indica y sugiere el
+motor `regex`.
+
+```bash
+python -m pq_cbom.cli scan-contracts ./contracts --engine slither
+```
+
+### OSV.dev — CVEs reales de dependencias (`scan-deps --osv`)
+
+Consulta la base pública [OSV.dev](https://osv.dev) por las vulnerabilidades
+reales (CVE/GHSA con severidad y resumen) de cada dependencia con versión, en
+npm, PyPI, Go, Maven, crates.io y RubyGems. `--fail-on-cve` rompe el build si
+hay alguna.
+
+```bash
+python -m pq_cbom.cli scan-deps ./mi-repo --osv --fail-on-cve
+```
+
+### Collector de binarios y Docker (`scan-binary`)
+
+Cripto que no está en el código ni en los manifiestos: la enlazada en binarios
+(ELF/PE/Mach-O/.so/.wasm) o instalada en imágenes. Extrae strings y detecta la
+versión de la librería cripto (OpenSSL, BoringSSL, libgcrypt, mbedTLS, wolfSSL,
+GnuTLS, NSS, libsodium) y los algoritmos presentes; en Dockerfiles, la imagen
+base y los paquetes cripto instalados. Es heurística sobre strings, no
+desensamblado.
+
+```bash
+python -m pq_cbom.cli scan-binary ./build
+```
