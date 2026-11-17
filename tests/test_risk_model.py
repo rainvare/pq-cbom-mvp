@@ -5,14 +5,24 @@ from types import SimpleNamespace
 from pq_cbom.risk_model import assess, mosca
 
 
-def _entry(pq_status, category, rule_id="X", band="high", action="migrar", location="f:1", replacement="Z"):
+def _entry(pq_status, category, rule_id="X", band="high", action="migrar", location="f:1", replacement="Z", snippet=""):
     return SimpleNamespace(
-        finding=SimpleNamespace(location=location),
+        finding=SimpleNamespace(location=location, snippet=snippet),
         classification=SimpleNamespace(
             pq_status=pq_status, category=category, rule_id=rule_id, replacement=replacement
         ),
         priority=SimpleNamespace(band=band, recommended_action=action),
     )
+
+
+def test_assess_counts_short_keys():
+    entries = [
+        _entry("vulnerable", "asymmetric", "RSA", snippet="clave privada: RSAPublicKey 1024 bits [CLAVE CORTA]"),
+        _entry("vulnerable", "asymmetric", "RSA", snippet="clave pública: RSAPublicKey 4096 bits"),
+    ]
+    a = assess(entries)
+    assert a.short_keys == 1
+    assert a.short_key_examples and "1024" in a.short_key_examples[0]["evidence"]
 
 
 def test_mosca_at_risk_when_x_plus_y_exceed_z():

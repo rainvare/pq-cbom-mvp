@@ -1,0 +1,147 @@
+# Reglas de análisis de vulnerabilidades de smart contracts (Solidity)
+# ====================================================================
+# Detección heurística por patrón, alineada con el SWC Registry
+# (https://swcregistry.io). Es un linter estático: señala patrones de RIESGO
+# para revisión humana, no una prueba formal. Puede producir falsos positivos
+# (p.ej. una llamada de bajo nivel cuyo retorno sí se comprueba en otra línea).
+#
+# severity: critical | high | medium | low | info
+#
+# Campos por regla:
+#   id          identificador (SWC-xxx cuando aplica, o PQ-* para cripto)
+#   severity    gravedad
+#   category    agrupación legible
+#   title       título corto
+#   match       patrones regex (case-insensitive) que evidencian el patrón
+#   rationale   por qué es un riesgo
+#   remediation cómo mitigarlo
+#   references  SWC u otra referencia
+
+version: "1.0.0"
+
+rules:
+  - id: SWC-115-tx-origin
+    severity: high
+    category: control-de-acceso
+    title: "Autorización con tx.origin"
+    match: ["tx\\.origin"]
+    rationale: "tx.origin es el originador de la transacción, no el llamante directo; usarlo para autorización permite ataques de phishing vía contrato intermediario."
+    remediation: "Usar msg.sender para control de acceso."
+    references: ["SWC-115"]
+
+  - id: SWC-107-reentrancy
+    severity: critical
+    category: reentrancy
+    title: "Llamada externa con valor (riesgo de reentrada)"
+    match: ["\\.call\\{\\s*value\\s*:", "\\.call\\.value\\(", "\\.call\\{value:"]
+    rationale: "Enviar ether con call de bajo nivel antes de actualizar el estado permite reentrada (p.ej. The DAO)."
+    remediation: "Aplicar checks-effects-interactions o un ReentrancyGuard; preferir patrones pull."
+    references: ["SWC-107"]
+
+  - id: SWC-104-unchecked-call
+    severity: medium
+    category: manejo-de-errores
+    title: "Retorno de llamada de bajo nivel sin comprobar"
+    match: ["\\.call\\(", "\\.delegatecall\\(", "\\.staticcall\\("]
+    rationale: "Las llamadas de bajo nivel devuelven un bool en vez de revertir; ignorarlo puede dejar pasar fallos silenciosos."
+    remediation: "Comprobar el valor de retorno: (bool ok, ) = addr.call(...); require(ok)."
+    references: ["SWC-104"]
+
+  - id: SWC-112-delegatecall
+    severity: high
+    category: delegatecall
+    title: "Uso de delegatecall"
+    match: ["delegatecall"]
+    rationale: "delegatecall ejecuta código externo en el contexto de almacenamiento del contrato; a una dirección no confiable puede secuestrar el contrato."
+    remediation: "Nunca hacer delegatecall a direcciones controladas por el usuario; fijar la librería/implementación."
+    references: ["SWC-112"]
+
+  - id: SWC-106-selfdestruct
+    severity: high
+    category: autodestruccion
+    title: "selfdestruct / suicide"
+    match: ["selfdestruct\\(", "suicide\\("]
+    rationale: "Un selfdestruct sin control de acceso adecuado permite destruir el contrato y enviar sus fondos a cualquiera."
+    remediation: "Proteger con control de acceso estricto o eliminar si no es necesario."
+    references: ["SWC-106"]
+
+  - id: SWC-120-weak-randomness
+    severity: medium
+    category: aleatoriedad
+    title: "Aleatoriedad a partir de variables de bloque"
+    match: ["block\\.timestamp", "block\\.difficulty", "block\\.number", "block\\.coinbase", "blockhash\\(", "\\bnow\\b"]
+    rationale: "Las variables de bloque son influenciables/predecibles por mineros; no sirven como fuente de aleatoriedad ni para lógica crítica de tiempo."
+    remediation: "Usar un oráculo de aleatoriedad verificable (p.ej. Chainlink VRF)."
+    references: ["SWC-120", "SWC-116"]
+
+  - id: SWC-101-integer-overflow
+    severity: medium
+    category: aritmetica
+    title: "Solidity <0.8 sin protección de overflow"
+    match: ["pragma\\s+solidity\\s*[\\^>=~ ]*0\\.[0-7]\\."]
+    rationale: "Antes de Solidity 0.8 la aritmética no revierte en overflow/underflow; sin SafeMath es explotable."
+    remediation: "Actualizar a Solidity >=0.8.0 o usar SafeMath en todas las operaciones."
+    references: ["SWC-101"]
+
+  - id: SWC-103-floating-pragma
+    severity: low
+    category: configuracion
+    title: "Pragma flotante"
+    match: ["pragma\\s+solidity\\s*\\^"]
+    rationale: "Un pragma flotante (^) permite compilar con versiones no auditadas del compilador."
+    remediation: "Fijar una versión exacta del compilador (p.ej. pragma solidity 0.8.24;)."
+    references: ["SWC-103"]
+
+  - id: SWC-111-deprecated
+    severity: medium
+    category: obsoleto
+    title: "Construcción obsoleta de Solidity"
+    match: ["\\bsha3\\b", "\\bsuicide\\b", "\\bthrow\\b", "\\bcallcode\\b", "\\bvar\\s+"]
+    rationale: "sha3/suicide/throw/callcode/var están obsoletos o eliminados; indican código antiguo y potencialmente inseguro."
+    remediation: "Usar keccak256, selfdestruct, revert/require y tipos explícitos."
+    references: ["SWC-111"]
+
+  - id: SWC-134-transfer-gas
+    severity: low
+    category: envio-de-ether
+    title: "transfer/send con estipendio de gas fijo"
+    match: ["\\.transfer\\(", "\\.send\\("]
+    rationale: "transfer/send fijan 2300 de gas; tras EIP-1884 pueden fallar con receptores que son contratos (proxies, multisig)."
+    remediation: "Usar call{value: x}(\"\") comprobando el retorno, con protección de reentrada."
+    references: ["SWC-134"]
+
+  - id: SWC-133-encodepacked-collision
+    severity: low
+    category: hashing
+    title: "abi.encodePacked con tipos dinámicos"
+    match: ["abi\\.encodePacked\\("]
+    rationale: "abi.encodePacked con múltiples argumentos dinámicos puede producir colisiones de hash (misma salida para entradas distintas)."
+    remediation: "Usar abi.encode, o separadores de longitud fija entre argumentos dinámicos."
+    references: ["SWC-133"]
+
+  - id: PQ-ecrecover-ecdsa
+    severity: medium
+    category: criptografia
+    title: "ecrecover (ECDSA secp256k1)"
+    match: ["ecrecover\\("]
+    rationale: "ecrecover verifica firmas ECDSA sobre secp256k1: rompible por Shor (riesgo post-cuántico) y propenso a maleabilidad / dirección cero si no se valida el retorno."
+    remediation: "Validar que el resultado != address(0); considerar ECDSA de OpenZeppelin; monitorear estándares de firma PQC on-chain."
+    references: ["SWC-117", "SWC-122"]
+
+  - id: SEC-hardcoded-secret
+    severity: high
+    category: secretos
+    title: "Posible secreto hardcodeado (32 bytes)"
+    match: ["0x[a-fA-F0-9]{64}"]
+    rationale: "Una constante de 32 bytes en el código puede ser una clave privada o semilla; todo lo on-chain es público."
+    remediation: "Nunca almacenar secretos on-chain; si es un hash, documentarlo. Revisar manualmente."
+    references: []
+
+  - id: SEC-unprotected-owner
+    severity: medium
+    category: control-de-acceso
+    title: "Cambio de propietario/privilegio sin modificador aparente"
+    match: ["owner\\s*=\\s*msg\\.sender", "selfdestruct\\(.*msg\\.sender"]
+    rationale: "Asignar owner o destruir según msg.sender sin modificador de acceso puede permitir una toma de control."
+    remediation: "Usar un patrón Ownable auditado (OpenZeppelin) y modificadores onlyOwner."
+    references: ["SWC-105"]
