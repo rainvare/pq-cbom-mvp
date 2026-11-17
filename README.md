@@ -174,13 +174,13 @@ python -m pq_cbom.cli risk cbom.json                       # evaluación de ries
 
 ## Sitio web (landing + demo)
 
-El directorio `web/` contiene una landing que explica problema y solución, y una
+El directorio `docs/` contiene una landing que explica problema y solución, y una
 **demo interactiva** que renderiza un reporte real generado por el escáner:
 KPIs de postura, preparación cuántica, el teorema de Mosca con sliders en vivo,
 top de riesgos HNDL, hoja de ruta y la base de conocimiento buscable.
 
 Es estático (HTML/CSS/JS vanilla, sin build). Los datos de la demo están
-empaquetados como JS (`web/data/*.js`) para que funcione incluso abriendo el
+empaquetados como JS (`docs/data/*.js`) para que funcione incluso abriendo el
 archivo directamente. Para regenerarlos desde el código:
 
 ```bash
@@ -190,10 +190,10 @@ import json
 from pq_cbom.knowledge import KnowledgeBase
 kb = KnowledgeBase.load()
 cbom = json.load(open('/tmp/cbom.json'))
-open('web/data/sample_cbom.js','w').write('window.SAMPLE_CBOM = '+json.dumps(cbom, ensure_ascii=False)+';')
-open('web/data/knowledge.js','w').write('window.KNOWLEDGE = '+json.dumps(
+open('docs/data/sample_cbom.js','w').write('window.SAMPLE_CBOM = '+json.dumps(cbom, ensure_ascii=False)+';')
+open('docs/data/knowledge.js','w').write('window.KNOWLEDGE = '+json.dumps(
     {'version': kb.version, 'algorithms':[e.to_dict() for e in kb.all()]}, ensure_ascii=False)+';')
 PY
 ```
 
-Para servirlo: cualquier hosting estático (Netlify, GitHub Pages) apuntando a `web/`.
+Para servirlo: cualquier hosting estático (Netlify, GitHub Pages) apuntando a `docs/` (GitHub Pages usa esa carpeta).
